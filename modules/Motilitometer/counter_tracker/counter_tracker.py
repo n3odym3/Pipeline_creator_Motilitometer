@@ -14,7 +14,7 @@ from __future__ import annotations
 from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
-
+from loguru import logger
 from core.processing_base import ProcessingBase
 from .preprocessor import PreProcessor
 from .object_tracker import ObjectTracker
@@ -378,6 +378,8 @@ class MotilitometerProcessor(ProcessingBase):
         self.denseflow_processor: Optional[DenseFlowProcessor] = None
 
         self._df_prev_gray: Optional[np.ndarray] = None
+        self._df_prev_idx: Optional[int] = None
+        self._df_gap_count: int = 0
         self._df_last_umat_flow = None
         self._df_prev_bgr: Optional[np.ndarray] = None
         self._live_frame_idx: int = 0
@@ -407,6 +409,8 @@ class MotilitometerProcessor(ProcessingBase):
         self.tracker = None
         self.denseflow_processor = None
         self._df_prev_gray = None
+        self._df_prev_idx = None
+        self._df_gap_count = 0
         self._df_last_umat_flow = None
         self._df_prev_bgr = None
         self._live_frame_idx = 0
@@ -438,6 +442,8 @@ class MotilitometerProcessor(ProcessingBase):
     def _reset_denseflow_state(self) -> None:
         """Resets internal dense flow and drift state (source change, video restart, etc.)."""
         self._df_prev_gray = None
+        self._df_prev_idx = None
+        self._df_gap_count = 0
         self._df_last_umat_flow = None
         self._df_prev_bgr = None
         self._live_frame_idx = 0
@@ -685,6 +691,7 @@ class MotilitometerProcessor(ProcessingBase):
 
         if self._df_prev_gray is None or self._df_prev_gray.shape != gray.shape:
             self._df_prev_gray = gray
+            self._df_prev_idx = frame_idx
             self._df_last_umat_flow = None
             out_canvas = base_canvas.copy()
             drift_info = None
@@ -709,11 +716,26 @@ class MotilitometerProcessor(ProcessingBase):
             'iterations': p.get('df_iterations', 3),
             'poly_n': p.get('df_poly_n', 5),
             'poly_sigma': p.get('df_poly_sigma', 1.2),
+            'auto_levels': p.get('df_auto_levels', True),
         }
         mag, ang, flow_x, flow_y, self._df_last_umat_flow = DenseFlowProcessor.compute_flow(
             self._df_prev_gray, gray, self._df_last_umat_flow, fb_params, self.denseflow_processor.opencl_available
         )
         self._df_prev_gray = gray
+
+        # Track frame index continuity for diagnostics (do NOT divide Farneback flow by `gap`:
+        # dense optical flow is a local operator that saturates at the particle diameter, so
+        # dividing by gap under-estimates speed; upstream sources pace via is_ready()).
+        prev_idx = self._df_prev_idx
+        self._df_prev_idx = frame_idx
+        if frame_idx is not None and prev_idx is not None and frame_idx - prev_idx > 1:
+            gap = int(frame_idx - prev_idx)
+            self._df_gap_count += 1
+            if self._df_gap_count in (1, 10, 100) or self._df_gap_count % 1000 == 0:
+                logger.warning(
+                    f"DenseFlow: {self._df_gap_count} frame gap(s) detected (last: {gap - 1} frame(s) "
+                    f"lost before frame {frame_idx})."
+                )
 
         filter_stage = p.get("focus_filter_stage", "Pre-processing")
         is_post_focus = (
@@ -826,6 +848,7 @@ class MotilitometerProcessor(ProcessingBase):
             'iterations': p.get('df_iterations', 3),
             'poly_n': p.get('df_poly_n', 5),
             'poly_sigma': p.get('df_poly_sigma', 1.2),
+            'auto_levels': p.get('df_auto_levels', True),
         }
         calib = float(p.get('df_calibration', 1.0))
         fps = float(p.get('df_fps', 30.0))
@@ -833,8 +856,8 @@ class MotilitometerProcessor(ProcessingBase):
         mag, ang, flow_x, flow_y, _ = DenseFlowProcessor.compute_flow(
             self._df_prev_gray, gray, None, fb_params, self.denseflow_processor.opencl_available
         )
-        self._df_prev_gray = gray.copy()
-        self._df_prev_bgr = curr_bgr.copy()
+        self._df_prev_gray = gray
+        self._df_prev_bgr = curr_bgr
 
         filter_stage = p.get("focus_filter_stage", "Pre-processing")
         is_post_focus = (

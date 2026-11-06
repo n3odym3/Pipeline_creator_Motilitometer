@@ -27,6 +27,7 @@ from .counter_tracker import (
     batch_worker_both_chunk,
 )
 from .object_tracker import ObjectTracker
+from .denseflow_processor import DenseFlowProcessor
 from .drift_processor import DriftProcessor
 from .angle_export import (
     PI_DEFAULT_LIGHT_POS,
@@ -596,6 +597,7 @@ class counter_tracker_win(WindowBase):
         self.pi_label_tag = f"motilitometer_pi_label_{U}"
         self.pi_text_tag = f"motilitometer_pi_text_{U}"
         self.emit_pi_tag = f"motilitometer_emit_pi_{U}"
+        self.pi_settings_group_tag = f"motilitometer_pi_settings_grp_{U}"
         self.pi_light_pos_tag = f"motilitometer_pi_light_pos_{U}"
         self.pi_preset_tag = f"motilitometer_pi_preset_{U}"
         self.pi_toward_lbl_tag = f"motilitometer_pi_toward_lbl_{U}"
@@ -663,8 +665,8 @@ class counter_tracker_win(WindowBase):
                     dpg.add_text("0", tag=self.count_text_tag)
                     dpg.add_text(" | Motility:", tag=self.motility_label_tag)
                     dpg.add_text("--", tag=self.motility_text_tag)
-                    dpg.add_text(" | Phototaxis:", tag=self.pi_label_tag)
-                    dpg.add_text("--", tag=self.pi_text_tag)
+                    dpg.add_text(" | Phototaxis:", tag=self.pi_label_tag, show=bool(self.emit_phototaxis_series))
+                    dpg.add_text("--", tag=self.pi_text_tag, show=bool(self.emit_phototaxis_series))
 
                 dpg.add_separator()
 
@@ -1092,59 +1094,60 @@ class counter_tracker_win(WindowBase):
                     # ── Phototaxis Index UI ────────────────────────────────
                     t_arrow, a_arrow = pi_light_arrows(self.pi_light_pos)
                     with dpg.collapsing_header(label="Phototaxis Index", default_open=False):
-                        with dpg.group(horizontal=True):
-                            add_check(label="Emit Series", default_value=bool(self.emit_phototaxis_series),
-                                      callback=self._on_pi_setting_cb, tag=self.emit_pi_tag)
-                            tooltip(self.emit_pi_tag,
-                                    "Emit Phototaxis Index (Toward - Away)/(Toward + Away) [-1, +1] time series\n"
-                                    "on Result and Phototaxis output ports.")
+                        add_check(label="Compute & Emit Phototaxis Index", default_value=bool(self.emit_phototaxis_series),
+                                  callback=self._on_pi_setting_cb, tag=self.emit_pi_tag)
+                        tooltip(self.emit_pi_tag,
+                                "Compute and emit the Phototaxis Index (Toward - Away)/(Toward + Away) [-1, +1]\n"
+                                "on the Result and Phototaxis output ports.\n"
+                                "When unchecked, nothing is computed or emitted.")
+                        with dpg.group(tag=self.pi_settings_group_tag, show=bool(self.emit_phototaxis_series)):
                             add_check(label="Weight Speed", default_value=bool(self.pi_weight_speed),
                                       callback=self._on_pi_setting_cb, tag=self.pi_weight_speed_tag)
                             tooltip(self.pi_weight_speed_tag,
                                     "Weight each angle by vector speed magnitude (µm/s) instead of raw vector counts.")
-                        with dpg.group(horizontal=True):
-                            dpg.add_text("Light Pos:", color=(150, 150, 150))
-                            add_combo(
-                                items=list(PI_LIGHT_POSITIONS),
-                                default_value=self.pi_light_pos,
-                                callback=self._on_pi_light_pos_cb,
-                                tag=self.pi_light_pos_tag,
-                                width=scale(130),
-                            )
-                            tooltip(self.pi_light_pos_tag,
-                                    "Position of the light source in screen coordinates:\n"
-                                    "- Bottom (↓): 270° (default)\n"
-                                    "- Top (↑): 90°\n"
-                                    "- Right (→): 0°\n"
-                                    "- Left (←): 180°\n"
-                                    "Positive index (+1) = movement toward the light.")
-                        with dpg.group(horizontal=True):
-                            dpg.add_text("Preset:   ", color=(150, 150, 150))
-                            add_combo(
-                                items=list(PI_PRESETS),
-                                default_value=self.pi_preset,
-                                callback=self._on_pi_preset_cb,
-                                tag=self.pi_preset_tag,
-                                width=scale(210),
-                            )
-                        with dpg.group(horizontal=True):
-                            dpg.add_text(f"Toward ({t_arrow}):", tag=self.pi_toward_lbl_tag, color=(100, 220, 140))
-                            add_float(tag=self.pi_up_min_tag, default_value=float(self.pi_up_min),
-                                      min_value=0.0, max_value=360.0, speed=1.0, format="%.0f°",
-                                      width=scale(75), callback=self._on_pi_custom_cb)
-                            dpg.add_text("to", color=(150, 150, 150))
-                            add_float(tag=self.pi_up_max_tag, default_value=float(self.pi_up_max),
-                                      min_value=0.0, max_value=360.0, speed=1.0, format="%.0f°",
-                                      width=scale(75), callback=self._on_pi_custom_cb)
-                        with dpg.group(horizontal=True):
-                            dpg.add_text(f"Away ({a_arrow}):  ", tag=self.pi_away_lbl_tag, color=(230, 140, 110))
-                            add_float(tag=self.pi_down_min_tag, default_value=float(self.pi_down_min),
-                                      min_value=0.0, max_value=360.0, speed=1.0, format="%.0f°",
-                                      width=scale(75), callback=self._on_pi_custom_cb)
-                            dpg.add_text("to", color=(150, 150, 150))
-                            add_float(tag=self.pi_down_max_tag, default_value=float(self.pi_down_max),
-                                      min_value=0.0, max_value=360.0, speed=1.0, format="%.0f°",
-                                      width=scale(75), callback=self._on_pi_custom_cb)
+                            with dpg.group(horizontal=True):
+                                dpg.add_text("Light Pos:", color=(150, 150, 150))
+                                add_combo(
+                                    items=list(PI_LIGHT_POSITIONS),
+                                    default_value=self.pi_light_pos,
+                                    callback=self._on_pi_light_pos_cb,
+                                    tag=self.pi_light_pos_tag,
+                                    width=scale(130),
+                                )
+                                tooltip(self.pi_light_pos_tag,
+                                        "Position of the light source in screen coordinates:\n"
+                                        "- Bottom (↓): 270° (default)\n"
+                                        "- Top (↑): 90°\n"
+                                        "- Right (→): 0°\n"
+                                        "- Left (←): 180°\n"
+                                        "Positive index (+1) = movement toward the light.")
+                            with dpg.group(horizontal=True):
+                                dpg.add_text("Preset:   ", color=(150, 150, 150))
+                                add_combo(
+                                    items=list(PI_PRESETS),
+                                    default_value=self.pi_preset,
+                                    callback=self._on_pi_preset_cb,
+                                    tag=self.pi_preset_tag,
+                                    width=scale(210),
+                                )
+                            with dpg.group(horizontal=True):
+                                dpg.add_text(f"Toward ({t_arrow}):", tag=self.pi_toward_lbl_tag, color=(100, 220, 140))
+                                add_float(tag=self.pi_up_min_tag, default_value=float(self.pi_up_min),
+                                          min_value=0.0, max_value=360.0, speed=1.0, format="%.0f°",
+                                          width=scale(75), callback=self._on_pi_custom_cb)
+                                dpg.add_text("to", color=(150, 150, 150))
+                                add_float(tag=self.pi_up_max_tag, default_value=float(self.pi_up_max),
+                                          min_value=0.0, max_value=360.0, speed=1.0, format="%.0f°",
+                                          width=scale(75), callback=self._on_pi_custom_cb)
+                            with dpg.group(horizontal=True):
+                                dpg.add_text(f"Away ({a_arrow}):  ", tag=self.pi_away_lbl_tag, color=(230, 140, 110))
+                                add_float(tag=self.pi_down_min_tag, default_value=float(self.pi_down_min),
+                                          min_value=0.0, max_value=360.0, speed=1.0, format="%.0f°",
+                                          width=scale(75), callback=self._on_pi_custom_cb)
+                                dpg.add_text("to", color=(150, 150, 150))
+                                add_float(tag=self.pi_down_max_tag, default_value=float(self.pi_down_max),
+                                          min_value=0.0, max_value=360.0, speed=1.0, format="%.0f°",
+                                          width=scale(75), callback=self._on_pi_custom_cb)
 
                 dpg.add_separator()
                 with dpg.collapsing_header(label="Speed & Spatial Calibration", default_open=False):
@@ -1824,6 +1827,8 @@ class counter_tracker_win(WindowBase):
                 self.pi_light_pos = normalize_pi_light_pos(flat["pi_light_pos"])
             if "pi_preset" in flat:
                 self.pi_preset = normalize_pi_preset(flat["pi_preset"])
+            if "emit_phototaxis_series" in flat:
+                self.emit_phototaxis_series = bool(flat["emit_phototaxis_series"])
             preset_bounds = pi_preset_ranges(self.pi_preset, self.pi_light_pos)
             if preset_bounds is not None:
                 self.pi_up_min, self.pi_up_max, self.pi_down_min, self.pi_down_max = preset_bounds
@@ -2118,6 +2123,9 @@ class counter_tracker_win(WindowBase):
         ):
             if dpg.does_item_exist(tag):
                 dpg.set_value(tag, float(val))
+        if dpg.does_item_exist(self.emit_pi_tag):
+            dpg.set_value(self.emit_pi_tag, bool(self.emit_phototaxis_series))
+        self._update_pi_visibility()
 
     def _on_pi_light_pos_cb(self, sender=None, app_data=None, *args, **kwargs) -> None:
         self.pi_light_pos = normalize_pi_light_pos(
@@ -2146,8 +2154,18 @@ class counter_tracker_win(WindowBase):
             dpg.set_value(self.pi_preset_tag, "Custom Range")
         self._on_pi_setting_cb()
 
+    def _update_pi_visibility(self) -> None:
+        """Show Phototaxis settings / readout only when the index is enabled."""
+        on = bool(self._val(self.emit_pi_tag, self.emit_phototaxis_series))
+        for tag in (self.pi_settings_group_tag, self.pi_label_tag, self.pi_text_tag):
+            if dpg.does_item_exist(tag):
+                dpg.configure_item(tag, show=on)
+        if not on and dpg.does_item_exist(self.pi_text_tag):
+            dpg.set_value(self.pi_text_tag, "--")
+
     def _on_pi_setting_cb(self, *args, **kwargs) -> None:
         self.emit_phototaxis_series = bool(self._val(self.emit_pi_tag, self.emit_phototaxis_series))
+        self._update_pi_visibility()
         self.pi_light_pos = normalize_pi_light_pos(self._val(self.pi_light_pos_tag, self.pi_light_pos))
         self.pi_preset = normalize_pi_preset(self._val(self.pi_preset_tag, self.pi_preset))
         self.pi_up_min = float(self._val(self.pi_up_min_tag, self.pi_up_min))
@@ -2492,7 +2510,17 @@ class counter_tracker_win(WindowBase):
             bool(params.get("drift_reuse_preprocessed", False)),
             self._live_preprocessed_drift_map is not None,
         )
-        if self._last_input_data is not None and self._monitor_thread_running and not self._batch_running:
+        # Only re-process the cached frame when inspecting a static/paused contour frame;
+        # in denseflow/both or during active streaming, clearing the queue drops live frames
+        # and re-submitting the same frame yields prev_gray == gray (0 µm/s).
+        if (
+            self._last_input_data is not None
+            and self._monitor_thread_running
+            and not self._batch_running
+            and params.get("processing_mode", "contour") == "contour"
+            and not params.get("enable_tracking", False)
+            and (time.perf_counter() - getattr(self, "_last_frame_recv_ts", 0.0)) > 0.25
+        ):
             self.processor.clear()
             self.processor.submit(self._last_input_data)
 
@@ -2575,6 +2603,20 @@ class counter_tracker_win(WindowBase):
         except AttributeError:
             pass
 
+    def set_acquisition(self, fps: Optional[float] = None, calibration: Optional[float] = None) -> None:
+        """Called by an upstream source (e.g. the Motility Simulator) so that the live
+        speed conversion (px/frame -> µm/s) uses the same fps / µm-per-px as the source."""
+        changed = False
+        for tag, val, attr in ((self.fps_tag, fps, "fps"), (self.calibration_tag, calibration, "calibration")):
+            if val is None or float(val) <= 0 or not dpg.does_item_exist(tag):
+                continue
+            if abs(float(self._val(tag, getattr(self, attr))) - float(val)) > 1e-9:
+                dpg.set_value(tag, float(val))
+                setattr(self, attr, float(val))
+                changed = True
+        if changed:
+            self._update_param_cb(None, None)
+
     def input_cb(self, *args, **kwargs):
         data      = kwargs.get("data")      if "data"      in kwargs else (args[0] if args else None)
         data_type = kwargs.get("data_type") if "data_type" in kwargs else None
@@ -2634,6 +2676,7 @@ class counter_tracker_win(WindowBase):
 
         if not isinstance(frame, np.ndarray):
             return False
+        self._last_frame_recv_ts = time.perf_counter()
         self._last_input_data = (frame, frame_idx) if frame_idx is not None else frame
         return self.processor.submit(self._last_input_data)
 
@@ -2761,6 +2804,12 @@ class counter_tracker_win(WindowBase):
 
         # Prepare preprocessed frame shape and precompute any drift lock boundaries in worker thread
         params = batch_prepare_video_params(video_path, total_frames, params)
+        # Dense flow on a single GPU: several processes only fight over the same OpenCL
+        # device (and each re-JITs the kernels), so cap the pool when OpenCL is active.
+        if mode in ('denseflow', 'both') and DenseFlowProcessor.check_opencl():
+            if n_threads > 2:
+                logger.info(f"CounterTracker batch: OpenCL active, limiting workers {n_threads} -> 2 for {mode}")
+                n_threads = 2
         params["_n_workers"] = n_threads
 
         # ── Run in parallel ───────────────────────────────────────────
@@ -2810,7 +2859,7 @@ class counter_tracker_win(WindowBase):
         )
         need_tracking_for_pi = (
             mode == 'contour'
-            and (bool(params.get("emit_phototaxis_series", False)) or bool(self.connections.get("Phototaxis")))
+            and bool(params.get("emit_phototaxis_series", False))
         )
         run_tracker = enable_tracking or need_tracking_for_drift or need_tracking_for_pi
         tracking_speeds, tracking_motilities, all_raw_tracking_speeds = (
@@ -2947,6 +2996,7 @@ class counter_tracker_win(WindowBase):
         pi_down_min = float(params.get("pi_down_min", self.pi_down_min))
         pi_down_max = float(params.get("pi_down_max", self.pi_down_max))
         pi_weight_speed = bool(params.get("pi_weight_speed", self.pi_weight_speed))
+        pi_enabled = bool(params.get("emit_phototaxis_series", self.emit_phototaxis_series))
 
         raw_arrays = build_raw_arrays(frame_vectors) if frame_vectors else None
         phototaxis_y: List[float] = []
@@ -2962,17 +3012,20 @@ class counter_tracker_win(WindowBase):
             ang_mean = [float(v) if np.isfinite(v) else float("nan") for v in ang_mean_arr]
             ang_r = [float(v) if np.isfinite(v) else float("nan") for v in ang_r_arr]
 
-            pi_arr = hist_phototaxis_series(
-                raw_arrays["ang_counts"],
-                raw_arrays["ang_mag_sums"],
-                toward_min=pi_up_min,
-                toward_max=pi_up_max,
-                away_min=pi_down_min,
-                away_max=pi_down_max,
-                weight_by_mag=pi_weight_speed,
-            )
-            phototaxis_y = [round(float(v), 4) if np.isfinite(v) else float("nan") for v in pi_arr]
-            angle_cols = [("AngleMean_deg", ang_mean), ("AngleR", ang_r), ("Phototaxis", phototaxis_y)]
+            if pi_enabled:
+                pi_arr = hist_phototaxis_series(
+                    raw_arrays["ang_counts"],
+                    raw_arrays["ang_mag_sums"],
+                    toward_min=pi_up_min,
+                    toward_max=pi_up_max,
+                    away_min=pi_down_min,
+                    away_max=pi_down_max,
+                    weight_by_mag=pi_weight_speed,
+                )
+                phototaxis_y = [round(float(v), 4) if np.isfinite(v) else float("nan") for v in pi_arr]
+                angle_cols = [("AngleMean_deg", ang_mean), ("AngleR", ang_r), ("Phototaxis", phototaxis_y)]
+            else:
+                angle_cols = [("AngleMean_deg", ang_mean), ("AngleR", ang_r)]
 
         # Emit pooled Raw Speeds from 64-bin histogram (capped at 20,000 pts, matching MotilityReprocessor)
         if raw_speeds_modules and raw_arrays is not None:
@@ -2993,9 +3046,9 @@ class counter_tracker_win(WindowBase):
                 for module in raw_speeds_modules:
                     module.input_cb(sample=raw_sample, data_type=IOTypes.SAMPLE)
 
-        emit_pi_series = bool(params.get("emit_phototaxis_series", self.emit_phototaxis_series))
+        emit_pi_series = pi_enabled
         phototaxis_modules = self.connections.get("Phototaxis", [])
-        if phototaxis_y and (emit_pi_series or phototaxis_modules):
+        if phototaxis_y and emit_pi_series:
             valid_pi_pts = [
                 (xv, yv, rx)
                 for xv, yv, rx in zip(x_values, phototaxis_y, raw_frame_indices)
@@ -3003,7 +3056,7 @@ class counter_tracker_win(WindowBase):
             ]
             if valid_pi_pts:
                 pi_x, pi_y, pi_rx = zip(*valid_pi_pts)
-                target_pi_lists = (coverage_modules, phototaxis_modules) if emit_pi_series else (phototaxis_modules,)
+                target_pi_lists = (coverage_modules, phototaxis_modules)
                 self._emit_batch_series(
                     self._suid("Phototaxis", source),
                     f"Phototaxis_{source}",
@@ -3301,22 +3354,25 @@ class counter_tracker_win(WindowBase):
                 else:
                     self._set_text(self.motility_text_tag, "--")
 
-                pi_light_pos = normalize_pi_light_pos(self._val(self.pi_light_pos_tag, self.pi_light_pos))
-                pi_up_min = float(self._val(self.pi_up_min_tag, self.pi_up_min))
-                pi_up_max = float(self._val(self.pi_up_max_tag, self.pi_up_max))
-                pi_down_min = float(self._val(self.pi_down_min_tag, self.pi_down_min))
-                pi_down_max = float(self._val(self.pi_down_max_tag, self.pi_down_max))
-                pi_weight_spd = bool(self._val(self.pi_weight_speed_tag, self.pi_weight_speed))
-                pi_val = frame_phototaxis_index(
-                    vd.get("angles"),
-                    vd.get("magnitudes"),
-                    toward_min=pi_up_min,
-                    toward_max=pi_up_max,
-                    away_min=pi_down_min,
-                    away_max=pi_down_max,
-                    weight_by_mag=pi_weight_spd,
-                )
-                self._set_text(self.pi_text_tag, self._format_pi_value(pi_val, pi_light_pos))
+                if bool(self._val(self.emit_pi_tag, self.emit_phototaxis_series)):
+                    pi_light_pos = normalize_pi_light_pos(self._val(self.pi_light_pos_tag, self.pi_light_pos))
+                    pi_up_min = float(self._val(self.pi_up_min_tag, self.pi_up_min))
+                    pi_up_max = float(self._val(self.pi_up_max_tag, self.pi_up_max))
+                    pi_down_min = float(self._val(self.pi_down_min_tag, self.pi_down_min))
+                    pi_down_max = float(self._val(self.pi_down_max_tag, self.pi_down_max))
+                    pi_weight_spd = bool(self._val(self.pi_weight_speed_tag, self.pi_weight_speed))
+                    pi_val = frame_phototaxis_index(
+                        vd.get("angles"),
+                        vd.get("magnitudes"),
+                        toward_min=pi_up_min,
+                        toward_max=pi_up_max,
+                        away_min=pi_down_min,
+                        away_max=pi_down_max,
+                        weight_by_mag=pi_weight_spd,
+                    )
+                    self._set_text(self.pi_text_tag, self._format_pi_value(pi_val, pi_light_pos))
+                else:
+                    self._set_text(self.pi_text_tag, "--")
 
             # Update Drift Correction live status display if active
             if dpg.does_item_exist(self.drift_status_text_tag):
@@ -3431,10 +3487,8 @@ class counter_tracker_win(WindowBase):
                 if is_motility_mode and motility_val is not None:
                     push("Motility", f"Motility_{source}", float(motility_val), ["Result", "Motility"])
                 emit_pi_live = bool(self._val(self.emit_pi_tag, self.emit_phototaxis_series))
-                has_pi_conn = bool(self.connections.get("Phototaxis"))
-                if np.isfinite(pi_val) and (emit_pi_live or has_pi_conn):
-                    pi_keys = ["Result", "Phototaxis"] if emit_pi_live else ["Phototaxis"]
-                    push("Phototaxis", f"Phototaxis_{source}", float(pi_val), pi_keys)
+                if emit_pi_live and np.isfinite(pi_val):
+                    push("Phototaxis", f"Phototaxis_{source}", float(pi_val), ["Result", "Phototaxis"])
 
 # Exported symbols for the module registry
 CounterTrackerWin = counter_tracker_win

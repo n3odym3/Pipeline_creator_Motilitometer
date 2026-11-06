@@ -15,10 +15,12 @@ Encapsulates:
 
 from __future__ import annotations
 
+import threading
 import warnings
 from typing import Any, Dict, List, Optional, Tuple
 import cv2
 import numpy as np
+from loguru import logger
 
 from .preprocessor import PreProcessor
 from .contour_processor import ContourProcessor
@@ -27,6 +29,12 @@ from .drift_processor import DriftProcessor
 
 class DenseFlowProcessor:
     """Manages dense optical flow computation, filtering, drift correction, and visualizations."""
+
+    # Per-thread cache of the previous frame's blurred UMat (see compute_flow)
+    _tls = threading.local()
+    _fallback_logged: bool = False
+    # Minimum pyramid depth when 'auto_levels' is on (bounded by image size)
+    AUTO_MIN_LEVELS: int = 4
 
     def __init__(self) -> None:
         self.opencl_available = self.check_opencl()
@@ -44,17 +52,23 @@ class DenseFlowProcessor:
     @staticmethod
     def check_opencl() -> bool:
         """Checks if OpenCL acceleration is functional via cv2.UMat."""
-        u = None
         try:
             if not cv2.ocl.haveOpenCL():
                 return False
             cv2.ocl.setUseOpenCL(True)
-            u = cv2.UMat(np.zeros((4, 4), dtype=np.uint8))
-            return bool(cv2.ocl.useOpenCL())
+            if not cv2.ocl.useOpenCL():
+                return False
+            # Real functional probe: run the exact kernels used by the pipeline
+            a = cv2.UMat(np.random.randint(0, 255, (64, 64), dtype=np.uint8))
+            b = cv2.GaussianBlur(a, (5, 5), 0)
+            cv2.calcOpticalFlowFarneback(b, b, None, 0.5, 2, 15, 1, 5, 1.2, 0).get()
+            try:
+                logger.info(f"DenseFlow OpenCL device: {cv2.ocl.Device.getDefault().name()}")
+            except Exception:
+                pass
+            return True
         except Exception:
             return False
-        finally:
-            del u
 
     @classmethod
     def compute_flow(cls,
@@ -73,36 +87,63 @@ class DenseFlowProcessor:
 
         # Ensure parameters are properly typed and valid
         clean_params = dict(fb_params)
+        auto_levels = bool(clean_params.pop('auto_levels', True))
         winsize = max(3, int(clean_params.get('winsize', 15)) | 1)
         clean_params['winsize'] = winsize
-        clean_params['levels'] = max(1, int(clean_params.get('levels', 2)))
-        clean_params['iterations'] = max(1, int(clean_params.get('iterations', 3)))
+        levels = max(1, int(clean_params.get('levels', 2)))
+        pyr_scale = max(0.1, min(0.9, float(clean_params.get('pyr_scale', 0.5))))
+        iterations = max(1, int(clean_params.get('iterations', 3)))
+        if auto_levels:
+            # Farneback (poly_n 5/7) only tracks ~2-3 px displacement per pyramid level.
+            # Using a dyadic scale (<= 0.5) with >= 4 levels reaches 0.125x scale so fast
+            # objects (> 150 µm/s) stay inside the polynomial capture radius while costing
+            # less pixel area (1.33x) than 2 levels at pyr_scale=0.75 (1.56x).
+            if pyr_scale > 0.5:
+                pyr_scale = 0.5
+            min_side = min(gray.shape[:2])
+            max_levels = 1
+            while min_side * (pyr_scale ** max_levels) >= 32 and max_levels < 6:
+                max_levels += 1
+            levels = max(levels, min(cls.AUTO_MIN_LEVELS, max_levels))
+            iterations = max(iterations, 2)
+        clean_params['levels'] = levels
+        clean_params['iterations'] = iterations
         clean_params['poly_n'] = 7 if int(clean_params.get('poly_n', 5)) == 7 else 5
         clean_params['poly_sigma'] = float(clean_params.get('poly_sigma', 1.2))
-        clean_params['pyr_scale'] = float(clean_params.get('pyr_scale', 0.5))
+        clean_params['pyr_scale'] = pyr_scale
 
         blur_k = 3 if winsize <= 9 else 5
-        prev_smooth = cv2.GaussianBlur(prev_gray, (blur_k, blur_k), 0)
-        gray_smooth = cv2.GaussianBlur(gray, (blur_k, blur_k), 0)
 
+        flow = None
         if use_opencl:
-            prev_u = None
-            cur_u = None
-            flow_u = None
             try:
-                prev_u = cv2.UMat(prev_smooth)
-                cur_u = cv2.UMat(gray_smooth)
+                # Whole GPU chain: upload -> blur -> Farneback -> single download of the flow.
+                # The blurred UMat of the previous frame is reused (it was the "current"
+                # frame one iteration ago) -> half the uploads/blurs per frame.
+                cache = getattr(cls._tls, "cache", None)
+                if (cache is not None and cache[0] is prev_gray
+                        and cache[1] == blur_k and cache[2].shape[:2] == prev_gray.shape[:2]):
+                    prev_u = cache[3]
+                else:
+                    prev_u = cv2.GaussianBlur(cv2.UMat(prev_gray), (blur_k, blur_k), 0)
+                cur_u = cv2.GaussianBlur(cv2.UMat(gray), (blur_k, blur_k), 0)
                 flow_u = cv2.calcOpticalFlowFarneback(prev_u, cur_u, None, flags=0, **clean_params)
                 flow = flow_u.get()
-            except Exception:
-                flow = cv2.calcOpticalFlowFarneback(prev_smooth, gray_smooth, None, flags=0, **clean_params)
-            finally:
-                del flow_u, prev_u, cur_u
-        else:
+                # Keep a reference to `gray` so the identity check can't be fooled by id reuse.
+                cls._tls.cache = (gray, blur_k, gray, cur_u)
+            except Exception as exc:
+                cls._tls.cache = None
+                flow = None
+                if not cls._fallback_logged:
+                    cls._fallback_logged = True
+                    logger.warning(f"DenseFlow: OpenCL (UMat) path failed, falling back to CPU: {exc!r}")
+
+        if flow is None:
+            prev_smooth = cv2.GaussianBlur(prev_gray, (blur_k, blur_k), 0)
+            gray_smooth = cv2.GaussianBlur(gray, (blur_k, blur_k), 0)
             flow = cv2.calcOpticalFlowFarneback(prev_smooth, gray_smooth, None, flags=0, **clean_params)
 
-        flow_x = flow[..., 0]
-        flow_y = flow[..., 1]
+        flow_x, flow_y = cv2.split(flow)
         mag, ang = cv2.cartToPolar(flow_x, flow_y)
 
         return mag, ang, flow_x, flow_y, None
@@ -139,75 +180,70 @@ class DenseFlowProcessor:
         if not enable_drift and upper_mag > 0.0:
             active_mask &= (mag <= upper_mag)
 
-        if visu_layer == "Binary Mask":
-            layer = np.zeros((H, W, 3), dtype=np.uint8)
-            layer[binary_mask > 0] = (255, 255, 255)
-            active_mask = binary_mask > 0
-        elif visu_layer == "Speed Heatmap":
-            calib = float(p.get("df_calibration", 1.0))
-            fps = float(p.get("df_fps", 30.0))
-            scale = calib * fps
-            speed_um_s = mag * scale
-
-            heatmap_auto = p.get("df_heatmap_auto_range", p.get("heatmap_auto_range", True))
-            if heatmap_auto:
-                valid = speed_um_s[active_mask]
-                if len(valid) > 0:
-                    s_min, s_max = float(valid.min()), float(valid.max())
-                else:
-                    s_min, s_max = 0.0, 1.0
-            else:
-                s_min = float(p.get("df_heatmap_vmin", p.get("heatmap_vmin", 0.0)))
-                s_max = float(p.get("df_heatmap_vmax", p.get("heatmap_vmax", 100.0)))
-
-            if s_max > s_min:
-                m_norm = np.clip((speed_um_s - s_min) / (s_max - s_min) * 255.0, 0, 255).astype(np.uint8)
-            else:
-                m_norm = np.zeros((H, W), dtype=np.uint8)
-
-            heatmap = cv2.applyColorMap(m_norm, cv2.COLORMAP_TURBO)
-            layer = np.zeros((H, W, 3), dtype=np.uint8)
-            layer[active_mask] = heatmap[active_mask]
-        elif visu_layer == "Arrows Only":
-            layer = np.zeros((H, W, 3), dtype=np.uint8)
-        else:  # "HSV Flow"
-            hue = (ang * (90.0 / np.pi)).astype(np.uint8)
-            sat = np.full((H, W), 255, np.uint8)
-            if supersat:
-                val = np.full((H, W), 255, np.uint8)
-            else:
-                m_min, m_max = float(mag.min()), float(mag.max())
-                val = ((mag - m_min) * (255.0 / (m_max - m_min))).astype(np.uint8) if m_max > m_min else np.zeros((H, W), np.uint8)
-
-            hsv = cv2.merge((hue, sat, val))
-            if use_opencl:
-                hsv_u = None
-                bgr_u = None
-                try:
-                    hsv_u = cv2.UMat(hsv)
-                    bgr_u = cv2.cvtColor(hsv_u, cv2.COLOR_HSV2BGR)
-                    bgr = bgr_u.get()
-                except Exception:
-                    bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-                finally:
-                    del bgr_u, hsv_u
-            else:
-                bgr = cv2.cvtColor(hsv, cv2.COLOR_HSV2BGR)
-
-            layer = np.zeros((H, W, 3), dtype=np.uint8)
-            layer[active_mask] = bgr[active_mask]
-
         if overlay and original_bgr is not None:
             if original_bgr.shape[:2] != (H, W):
                 original_bgr = cv2.resize(original_bgr, (W, H))
             target_canvas = original_bgr.copy()
             if len(target_canvas.shape) == 2:
                 target_canvas = cv2.cvtColor(target_canvas, cv2.COLOR_GRAY2BGR)
-            if visu_layer != "Arrows Only" and np.any(active_mask):
-                blended = cv2.addWeighted(layer, opacity, target_canvas, 1.0 - opacity, 0.0)
-                target_canvas[active_mask] = blended[active_mask]
+            has_bg = True
         else:
-            target_canvas = layer
+            target_canvas = np.zeros((H, W, 3), dtype=np.uint8)
+            has_bg = False
+
+        if visu_layer == "Binary Mask":
+            ys, xs = np.nonzero(binary_mask > 0)
+            if len(xs) > 0:
+                if has_bg:
+                    target_canvas[ys, xs] = (
+                        255.0 * opacity + target_canvas[ys, xs].astype(np.float32) * (1.0 - opacity)
+                    ).astype(np.uint8)
+                else:
+                    target_canvas[ys, xs] = (255, 255, 255)
+        elif visu_layer == "Speed Heatmap":
+            ys, xs = np.nonzero(active_mask)
+            if len(xs) > 0:
+                calib = float(p.get("df_calibration", 1.0))
+                fps = float(p.get("df_fps", 30.0))
+                valid = mag[ys, xs] * (calib * fps)
+                heatmap_auto = p.get("df_heatmap_auto_range", p.get("heatmap_auto_range", True))
+                if heatmap_auto:
+                    s_min, s_max = float(valid.min()), float(valid.max())
+                else:
+                    s_min = float(p.get("df_heatmap_vmin", p.get("heatmap_vmin", 0.0)))
+                    s_max = float(p.get("df_heatmap_vmax", p.get("heatmap_vmax", 100.0)))
+                if s_max > s_min:
+                    m_norm = np.clip((valid - s_min) / (s_max - s_min) * 255.0, 0, 255).astype(np.uint8)
+                else:
+                    m_norm = np.zeros(len(xs), dtype=np.uint8)
+                colors = cv2.applyColorMap(m_norm.reshape(-1, 1), cv2.COLORMAP_TURBO)[:, 0, :]
+                if has_bg:
+                    target_canvas[ys, xs] = (
+                        colors.astype(np.float32) * opacity + target_canvas[ys, xs].astype(np.float32) * (1.0 - opacity)
+                    ).astype(np.uint8)
+                else:
+                    target_canvas[ys, xs] = colors
+        elif visu_layer != "Arrows Only":  # "HSV Flow"
+            ys, xs = np.nonzero(active_mask)
+            if len(xs) > 0:
+                hue_a = (ang[ys, xs] * (90.0 / np.pi)).astype(np.uint8)
+                sat_a = np.full_like(hue_a, 255)
+                if supersat:
+                    val_a = sat_a
+                else:
+                    m_min, m_max = float(mag.min()), float(mag.max())
+                    val_a = (
+                        ((mag[ys, xs] - m_min) * (255.0 / (m_max - m_min))).astype(np.uint8)
+                        if m_max > m_min else np.zeros_like(hue_a)
+                    )
+                hsv_a = np.stack((hue_a, sat_a, val_a), axis=-1).reshape(-1, 1, 3)
+                bgr_a = cv2.cvtColor(hsv_a, cv2.COLOR_HSV2BGR)[:, 0, :]
+                if has_bg:
+                    target_canvas[ys, xs] = (
+                        bgr_a.astype(np.float32) * opacity + target_canvas[ys, xs].astype(np.float32) * (1.0 - opacity)
+                    ).astype(np.uint8)
+                else:
+                    target_canvas[ys, xs] = bgr_a
 
         # Draw grid arrows when not in contour-tracking mode
         if (show_arrows or show_correction) and flow_x is not None and flow_y is not None and not use_contours:
@@ -316,11 +352,14 @@ class DenseFlowProcessor:
             total_px_count = None
 
             if render_vis:
-                mag_vis = mag_filt.copy()
-                ang_vis = ang.copy()
-                fx_vis = flow_x.copy() if flow_x is not None else None
-                fy_vis = flow_y.copy() if flow_y is not None else None
-                binary_vis = binary.copy()
+                if enable_drift:
+                    mag_vis = mag_filt.copy()
+                    ang_vis = ang.copy()
+                    fx_vis = flow_x.copy() if flow_x is not None else None
+                    fy_vis = flow_y.copy() if flow_y is not None else None
+                    binary_vis = binary.copy()
+                else:
+                    mag_vis, ang_vis, fx_vis, fy_vis, binary_vis = mag_filt, ang, flow_x, flow_y, binary
             else:
                 mag_vis = ang_vis = fx_vis = fy_vis = None
                 binary_vis = binary
@@ -644,6 +683,7 @@ class DenseFlowProcessor:
             'iterations': params.get('df_iterations', 3),
             'poly_n': params.get('df_poly_n', 5),
             'poly_sigma': params.get('df_poly_sigma', 1.2),
+            'auto_levels': params.get('df_auto_levels', True),
         }
         mag, ang, flow_x, flow_y, _ = cls.compute_flow(prev_gray, gray, None, fb_params, use_opencl)
         flow_vis, metric_val, mags_list, detections_list, filtered_bboxes, _, vectors_data = cls.compute_metrics_and_vis(
@@ -670,12 +710,21 @@ class DenseFlowProcessor:
             'iterations': params.get('df_iterations', 3),
             'poly_n': params.get('df_poly_n', 5),
             'poly_sigma': params.get('df_poly_sigma', 1.2),
+            'auto_levels': params.get('df_auto_levels', True),
         }
         calib = float(params.get('df_calibration', 1.0))
         fps = float(params.get('df_fps', 30.0))
 
-        prev_gray, _ = PreProcessor.apply(prev_bgr, params)
+        # Reuse the previous iteration's pre-processed gray (prev_bgr is the former curr_bgr)
+        # instead of running PreProcessor.apply twice per frame.
+        bcache = getattr(cls._tls, "both_cache", None)
+        if bcache is not None and bcache[0] is prev_bgr:
+            prev_gray = bcache[1]
+        else:
+            prev_gray, _ = PreProcessor.apply(prev_bgr, params)
         curr_gray, curr_canvas = PreProcessor.apply(curr_bgr, params)
+        # Stored before any focus masking so that it matches what apply(prev_bgr) would return.
+        cls._tls.both_cache = (curr_bgr, curr_gray.copy() if params.get("enable_focus_picking", False) else curr_gray)
 
         enable_focus = params.get("enable_preprocessing", True) and params.get("enable_focus_picking", False)
         in_focus_mask = None
