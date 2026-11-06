@@ -39,6 +39,7 @@ class NodalDataProcessor(WindowBase):
         super().__init__(**kwargs)
 
         # Internal state
+        self._is_closing: bool = False
         self.last_input_sample: Optional[Dict[str, Any]] = None
         self.last_output_sample: Optional[Dict[str, Any]] = None
 
@@ -226,7 +227,10 @@ class NodalDataProcessor(WindowBase):
             
     def _send_output(self, sample: Dict[str, Any]) -> None:
         """Send processed SAMPLE to connected modules."""
-        for module in self.connections.get("Processed Data", []):
+        targets = self.connections.get("Processed Data")
+        if not targets:
+            return
+        for module in targets:
             try:
                 module.input_cb(sample=sample, data_type=IOTypes.SAMPLE)
             except Exception as e:
@@ -234,28 +238,37 @@ class NodalDataProcessor(WindowBase):
  
     def _send_metadata(self, metadata: Dict[str, Any], base_sample: Optional[Dict[str, Any]] = None) -> None:
         """Send metadata to connected modules. Detects and sends auxiliary samples if found."""
+        proc_targets = self.connections.get("Processed Data")
+        meta_targets = self.connections.get("Metadata")
+        if not proc_targets and not meta_targets:
+            return
+
         # Check for extra samples to be displayed (superimposed)
         # Any dict in metadata that has 'x', 'y', and 'name' is treated as an extra sample
         # Derive its UUID from the base sample name for real-time updates
-        for k, v in metadata.items():
-            if isinstance(v, dict) and "x" in v and "y" in v and "name" in v:
-                # If name starts with an underscore, prepend the base sample name
-                if base_sample and v.get("name", "").startswith("_"):
-                    base_name = base_sample.get("name", "Data")
-                    v["name"] = f"{base_name}{v['name']}"
+        if proc_targets:
+            for k, v in metadata.items():
+                if isinstance(v, dict) and "x" in v and "y" in v and "name" in v:
+                    # If name starts with an underscore, prepend the base sample name
+                    if base_sample and v.get("name", "").startswith("_"):
+                        base_name = base_sample.get("name", "Data")
+                        v["name"] = f"{base_name}{v['name']}"
 
-                if "uuid" not in v:
-                    # Prefer UUID for stability across renames, fallback to name
-                    base_id = base_sample.get("uuid") or base_sample.get("name") if base_sample else self.UUID
-                    v["uuid"] = f"{base_id}_meta_{k}"
-                self._send_output(v)
+                    if "uuid" not in v:
+                        # Prefer UUID for stability across renames, fallback to name
+                        base_id = base_sample.get("uuid") or base_sample.get("name") if base_sample else self.UUID
+                        v["uuid"] = f"{base_id}_meta_{k}"
+                    self._send_output(v)
+
+        if not meta_targets:
+            return
 
         # Proceed with standard metadata output
         data = metadata
         if len(metadata) == 1:
-            data = list(metadata.values())[0]
+            data = next(iter(metadata.values()))
             
-        for module in self.connections.get("Metadata", []):
+        for module in meta_targets:
             try:
                 module.input_cb(data, data=data, sample=data, data_type=IOTypes.ANY)
             except Exception as e:
@@ -275,10 +288,13 @@ class NodalDataProcessor(WindowBase):
 
     def on_close(self) -> None:
         """Clean up the node editor resources."""
+        if getattr(self, "_is_closing", False):
+            return
+        self._is_closing = True
         if hasattr(self, 'node_editor'):
             self.node_editor.cleanup()
+        super().on_close()
 
 
 EXPORTED_CLASS = NodalDataProcessor
 EXPORTED_NAME = "Nodal Data Processor"
-

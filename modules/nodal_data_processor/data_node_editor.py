@@ -5,7 +5,7 @@ import json
 import dearpygui.dearpygui as dpg
 from typing import Dict, List, Tuple, Optional, Any, Type, Union
 from loguru import logger
-from collections import defaultdict
+from collections import defaultdict, deque
 
 from modules.nodal_data_processor.data_processor_base import DataProcessorBase
 from core.file_explorer import file_explorer
@@ -16,6 +16,9 @@ class DataNodeEditor:
     Node editor for data processing pipelines.
     Manages a graph of data processor nodes that can be connected and executed.
     """
+
+    _CACHED_PROCESSORS: Optional[Dict[str, Type[DataProcessorBase]]] = None
+    _CACHED_PROCESSOR_INFO: Dict[Type[DataProcessorBase], Dict[str, str]] = {}
     
     def __init__(self, parent_tag: Union[int, str], label: str = "Data Node Editor", parent_win: Optional[Any] = None) -> None:
         """
@@ -42,6 +45,7 @@ class DataNodeEditor:
         self.node_map: Dict[Union[int, str], DataProcessorBase] = {}  # Maps node_id to processor instance
         self.link_map: Dict[Union[int, str], Tuple[Union[int, str], Union[int, str]]] = {}  # Maps link_id to (output_attr_id, input_attr_id)
         self._pinned_node_labels: Dict[Union[int, str], str] = {}
+        self._cached_execution_plan: Optional[List[Tuple[Union[int, str], Optional[Union[int, str]], str]]] = None
         
         # UI tags
         self.editor_tag: str = f"data_node_editor_{self.uuid}"
@@ -60,6 +64,23 @@ class DataNodeEditor:
         
         # Build the UI
         self._build_ui()
+
+    def _invalidate_graph_cache(self) -> None:
+        """Invalidate the cached topological execution plan when graph topology changes."""
+        self._cached_execution_plan = None
+
+    def _clear_pinned_menu_items(self) -> None:
+        """Remove any pinned menu bar items belonging to this editor."""
+        pinned = getattr(self, "_pinned_node_labels", None)
+        if not pinned:
+            return
+        try:
+            from core.main_win import main_win
+            for label in list(pinned.values()):
+                main_win.remove_pinned_menu_item(label)
+        except ImportError:
+            pass
+        pinned.clear()
     
     def _load_processors(self, processors_dir: Optional[Union[str, Path]] = None) -> Dict[str, Type[DataProcessorBase]]:
         """
@@ -73,6 +94,9 @@ class DataNodeEditor:
             Dictionary mapping "category/processor_name" to their classes
             Root level processors use just "processor_name"
         """
+        if processors_dir is None and DataNodeEditor._CACHED_PROCESSORS is not None:
+            return dict(DataNodeEditor._CACHED_PROCESSORS)
+
         p_dir = Path(processors_dir) if processors_dir is not None else Path(__file__).resolve().parent / "processors"
         
         processors: Dict[str, Type[DataProcessorBase]] = {}
@@ -135,6 +159,9 @@ class DataNodeEditor:
         # Start scanning from root processors directory
         scan_directory(p_dir)
         
+        if processors_dir is None:
+            DataNodeEditor._CACHED_PROCESSORS = dict(processors)
+
         return processors
     
     def _get_processor_info(self, processor_class: Type[DataProcessorBase]) -> Dict[str, str]:
@@ -147,6 +174,10 @@ class DataNodeEditor:
         Returns:
             Dictionary with 'name' and 'description' keys
         """
+        cached = DataNodeEditor._CACHED_PROCESSOR_INFO.get(processor_class)
+        if cached is not None:
+            return cached
+
         # Create a dummy instance to get display name
         try:
             # Use a dummy node_id for inspection
@@ -158,10 +189,12 @@ class DataNodeEditor:
             name = processor_class.__name__
             description = processor_class.__doc__ or "No description"
         
-        return {
+        info = {
             "name": name,
             "description": description
         }
+        DataNodeEditor._CACHED_PROCESSOR_INFO[processor_class] = info
+        return info
     
     def _build_ui(self) -> None:
         """Build the node editor UI."""
@@ -211,6 +244,9 @@ class DataNodeEditor:
     
     def cleanup(self) -> None:
         """Clean up resources."""
+        self._clear_pinned_menu_items()
+        self._invalidate_graph_cache()
+
         # Clean up the handler registry
         if dpg.does_item_exist(self.handler_registry_tag):
             dpg.delete_item(self.handler_registry_tag)
@@ -386,8 +422,9 @@ class DataNodeEditor:
             # Reset search and repopulate list
             search_tag = f"{self.popup_tag}_search"
             if dpg.does_item_exist(search_tag):
-                dpg.set_value(search_tag, "")
-                self._populate_module_list("")
+                if dpg.get_value(search_tag) != "":
+                    dpg.set_value(search_tag, "")
+                    self._populate_module_list("")
             
             dpg.configure_item(self.popup_tag, pos=absolute_mouse_pos, show=True)
             dpg.focus_item(search_tag)
@@ -464,6 +501,7 @@ class DataNodeEditor:
                 processor = processor_class(node_id=node_id)
                 processor.node_editor = self
                 self.node_map[node_id] = processor
+                self._invalidate_graph_cache()
                 
                 # UI container for processor controls
                 with dpg.node_attribute(attribute_type=dpg.mvNode_Attr_Static):
@@ -535,6 +573,7 @@ class DataNodeEditor:
         if node_id in self.node_map:
             # Remove from map
             del self.node_map[node_id]
+            self._invalidate_graph_cache()
 
             # Remove pinned menu bar entry if this node was pinned
             pinned = getattr(self, '_pinned_node_labels', {})
@@ -568,6 +607,9 @@ class DataNodeEditor:
     
     def clear_all_nodes(self) -> None:
         """Clear all nodes from the editor."""
+        self._clear_pinned_menu_items()
+        self._invalidate_graph_cache()
+
         # Delete all links
         for link_id in list(self.link_map.keys()):
             if dpg.does_item_exist(link_id):
@@ -581,6 +623,7 @@ class DataNodeEditor:
         self.node_map.clear()
         
         logger.success("Cleared all nodes from data editor")
+
     def link_callback(self, sender: Union[int, str], app_data: Tuple[Union[int, str], Union[int, str]], user_data: Any = None, *args: Any) -> None:
         """Callback when a link is created between nodes."""
         attr_a, attr_b = app_data
@@ -640,6 +683,7 @@ class DataNodeEditor:
         link_id = dpg.generate_uuid()
         dpg.add_node_link(from_attr, to_attr, parent=self.editor_tag, tag=link_id)
         self.link_map[link_id] = (from_attr, to_attr)
+        self._invalidate_graph_cache()
 
     
     def delink_callback(self, sender: Union[int, str], app_data: Union[int, str], user_data: Any = None, *args: Any) -> None:
@@ -648,6 +692,7 @@ class DataNodeEditor:
         
         if link_id in self.link_map:
             del self.link_map[link_id]
+        self._invalidate_graph_cache()
         
         dpg.delete_item(link_id)
     
@@ -694,10 +739,12 @@ class DataNodeEditor:
             Dictionary mapping node_id to list of downstream node_ids
         """
         connections: Dict[Union[int, str], List[Union[int, str]]] = defaultdict(list)
+        orphaned_links = []
         
-        for from_attr, to_attr in self.link_map.values():
+        for link_id, (from_attr, to_attr) in self.link_map.items():
             # Safety check: ensure attributes still exist
             if not dpg.does_item_exist(from_attr) or not dpg.does_item_exist(to_attr):
+                orphaned_links.append(link_id)
                 continue
                 
             from_node = dpg.get_item_parent(from_attr)
@@ -728,10 +775,6 @@ class DataNodeEditor:
                 continue
         
         # Clean up orphaned links (links with deleted nodes)
-        orphaned_links = [
-            link_id for link_id, (src_attr, tgt_attr) in self.link_map.items()
-            if not dpg.does_item_exist(src_attr) or not dpg.does_item_exist(tgt_attr)
-        ]
         for link_id in orphaned_links:
             logger.debug(f"Cleaning up orphaned link {link_id}")
             if link_id in self.link_map:
@@ -764,7 +807,7 @@ class DataNodeEditor:
         
         # Find starting nodes - ONLY start from anchor to ensure 
         # we only process the flow connected to raw data
-        queue = []
+        queue: deque = deque()
         if self.anchor_node_tag in in_degree:
             # Anchor itself should have in_degree 0 as it's a source
             if in_degree[self.anchor_node_tag] == 0:
@@ -772,7 +815,7 @@ class DataNodeEditor:
         
         result = []
         while queue:
-            node_id = queue.pop(0)
+            node_id = queue.popleft()
             
             # Add to result if it's a processor node (exclude the anchor)
             if node_id in self.node_map:
@@ -805,7 +848,7 @@ class DataNodeEditor:
         # Match using normalized IDs
         try:
             target_id = dpg.get_alias_id(attr_id) if isinstance(attr_id, str) else int(attr_id)
-        except:
+        except Exception:
             target_id = attr_id
 
         children = dpg.get_item_children(node_id, slot=1)
@@ -826,6 +869,39 @@ class DataNodeEditor:
             return list(processor.outputs.keys())[index]
         except (ValueError, IndexError, TypeError):
             return "Out"
+
+    def _get_execution_plan(self) -> List[Tuple[Union[int, str], Optional[Union[int, str]], str]]:
+        """
+        Compile and cache the ordered execution plan:
+        List of (node_id, upstream_node_id, upstream_output_name).
+        """
+        if self._cached_execution_plan is not None:
+            return self._cached_execution_plan
+
+        connections = self._get_node_connections()
+        execution_order = self._topological_sort(connections)
+
+        upstream_map: Dict[Union[int, str], Union[int, str]] = {}
+        for src_node, targets in connections.items():
+            for tgt_node in targets:
+                if tgt_node not in upstream_map:
+                    upstream_map[tgt_node] = src_node
+
+        plan: List[Tuple[Union[int, str], Optional[Union[int, str]], str]] = []
+        for node_id in execution_order:
+            src_node = upstream_map.get(node_id)
+            upstream_id: Optional[Union[int, str]] = src_node if (src_node is not None and src_node in self.node_map) else None
+            output_name = "Out"
+            if upstream_id is not None:
+                for src_attr, tgt_attr in self.link_map.values():
+                    if dpg.does_item_exist(src_attr) and dpg.does_item_exist(tgt_attr):
+                        if dpg.get_item_parent(tgt_attr) == node_id and dpg.get_item_parent(src_attr) == upstream_id:
+                            output_name = self._get_output_name_from_attr(upstream_id, src_attr)
+                            break
+            plan.append((node_id, upstream_id, output_name))
+
+        self._cached_execution_plan = plan
+        return plan
 
     def execute_pipeline(
         self,
@@ -849,13 +925,8 @@ class DataNodeEditor:
         if y_data is None:
             y_data = []
         
-        # Build connection graph
-        connections = self._get_node_connections()
-        
-        # Get execution order
-        execution_order = self._topological_sort(connections)
-        
-        if not execution_order:
+        plan = self._get_execution_plan()
+        if not plan:
             return x_data, y_data, labels, {}
         
         # Data cache for each node: result from processor.process()
@@ -864,60 +935,50 @@ class DataNodeEditor:
         pipeline_metadata: Dict[str, Any] = {}
         
         # Execute nodes in order
-        for node_id in execution_order:
+        for node_id, upstream_id, output_name in plan:
             processor = self.node_map.get(node_id)
             if processor is None:
                 continue
             
-            # Get input data
-            # Find upstream nodes
-            upstream_nodes = [
-                src_node for src_node, targets in connections.items()
-                if node_id in targets
-            ]
-            
             input_x, input_y, input_labels = x_data, y_data, labels
             
-            if upstream_nodes:
-                # Use data from first upstream node
-                upstream_id = upstream_nodes[0]
-                if upstream_id in node_data:
-                    results = node_data[upstream_id]
-                    
-                    # Find which output port is connected to this node's input
-                    output_name = "Out" # Default
-                    for link_id, (src_attr, tgt_attr) in self.link_map.items():
-                        if dpg.get_item_parent(tgt_attr) == node_id and dpg.get_item_parent(src_attr) == upstream_id:
-                            output_name = self._get_output_name_from_attr(upstream_id, src_attr)
-                            break
-                    
-                    if isinstance(results, dict):
-                        # Multi-output processor
-                        data = results.get(output_name)
-                        if isinstance(data, (tuple, list)) and len(data) >= 2:
-                             input_x, input_y = data[0], data[1]
-                             input_labels = data[2] if len(data) > 2 else input_labels
-                    elif isinstance(results, (tuple, list)):
-                        # Handle standard 2 or 3-tuple return
-                        input_x = results[0]
-                        input_y = results[1]
-                        if len(results) > 2:
-                            input_labels = results[2]
+            if upstream_id is not None and upstream_id in node_data:
+                results = node_data[upstream_id]
+                if isinstance(results, dict):
+                    # Multi-output processor
+                    data = results.get(output_name)
+                    if isinstance(data, (tuple, list)) and len(data) >= 2:
+                        input_x, input_y = data[0], data[1]
+                        input_labels = data[2] if len(data) > 2 else input_labels
+                elif isinstance(results, (tuple, list)):
+                    # Handle standard 2 or 3-tuple return
+                    input_x = results[0]
+                    input_y = results[1]
+                    if len(results) > 2:
+                        input_labels = results[2]
             
             # Process the data
+            accepts_labels = getattr(processor, "_accepts_labels", None)
             try:
-                result = processor.process(input_x, input_y, labels=input_labels)
+                if accepts_labels is False:
+                    result = processor.process(input_x, input_y)
+                    if isinstance(result, tuple) and len(result) == 2:
+                        result = (result[0], result[1], input_labels)
+                else:
+                    result = processor.process(input_x, input_y, labels=input_labels)
+                    if accepts_labels is None:
+                        processor._accepts_labels = True
+
                 node_data[node_id] = result
                 
                 # Collect metadata (any key other than "Out")
                 if isinstance(result, dict):
                     for k, v in result.items():
                         if k != "Out":
-                            # Use node name or ID to avoid collisions if necessary, 
-                            # but for now just store globally
                             pipeline_metadata[k] = v
                             
             except TypeError:
+                processor._accepts_labels = False
                 try:
                     result = processor.process(input_x, input_y)
                     if isinstance(result, tuple):
@@ -939,23 +1000,22 @@ class DataNodeEditor:
                 node_data[node_id] = (input_x, input_y, input_labels)  # Pass through on error
         
         # Find the last node in execution order
-        if execution_order:
-            last_node_id = execution_order[-1]
-            if last_node_id in node_data:
-                final_result = node_data[last_node_id]
-                if isinstance(final_result, dict):
-                    # For multi-output nodes, default to "Out" as the pipeline result
-                    # or the first available output
-                    data = final_result.get("Out") or list(final_result.values())[0]
-                    if isinstance(data, (tuple, list)) and len(data) >= 2:
-                        lx, ly = data[0], data[1]
-                        llabels = data[2] if len(data) > 2 else labels
-                        return lx, ly, llabels, pipeline_metadata
-                elif isinstance(final_result, (tuple, list)):
-                    lx = final_result[0]
-                    ly = final_result[1]
-                    llabels = final_result[2] if len(final_result) > 2 else labels
+        last_node_id = plan[-1][0]
+        if last_node_id in node_data:
+            final_result = node_data[last_node_id]
+            if isinstance(final_result, dict):
+                # For multi-output nodes, default to "Out" as the pipeline result
+                # or the first available output
+                data = final_result.get("Out") or list(final_result.values())[0]
+                if isinstance(data, (tuple, list)) and len(data) >= 2:
+                    lx, ly = data[0], data[1]
+                    llabels = data[2] if len(data) > 2 else labels
                     return lx, ly, llabels, pipeline_metadata
+            elif isinstance(final_result, (tuple, list)):
+                lx = final_result[0]
+                ly = final_result[1]
+                llabels = final_result[2] if len(final_result) > 2 else labels
+                return lx, ly, llabels, pipeline_metadata
         
         return x_data, y_data, labels, pipeline_metadata
     
@@ -1113,6 +1173,8 @@ class DataNodeEditor:
                         link_id = dpg.generate_uuid()
                         dpg.add_node_link(from_attr, to_attr, parent=self.editor_tag, tag=link_id)
                         self.link_map[link_id] = (from_attr, to_attr)
+
+        self._invalidate_graph_cache()
     
     def save_to_file(self, filepath: str) -> bool:
         """
@@ -1172,7 +1234,3 @@ class DataNodeEditor:
         )
         if filepath:
             self.load_from_file(filepath)
-
-
-
-

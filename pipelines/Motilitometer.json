@@ -7,11 +7,11 @@
             "uuid": "714",
             "pos": [
                 24.53125,
-                39.30421909696521
+                39.2904953145917
             ],
             "size": [
                 31.406250000000004,
-                60.029607698001485
+                59.97322623828648
             ],
             "visible": true,
             "params": {
@@ -37,8 +37,8 @@
                 "enable_watershed": false,
                 "ws_peak_thresh": 40,
                 "ws_show_lines": true,
-                "auto_export_raw": true,
-                "calibration": 0.7575,
+                "auto_export_raw": false,
+                "calibration": 0.7574999928474426,
                 "fps": 30.0,
                 "gamma": 1.0,
                 "crop_type": "None",
@@ -66,7 +66,11 @@
                 "drift_active_ranges": "[0-500],[1000-1500]",
                 "drift_show_vector": true,
                 "drift_show_filtered": false,
-                "drift_show_correction": false
+                "drift_show_correction": false,
+                "drift_min_corr_speed": 0.0,
+                "drift_show_fake_drifters": false,
+                "drift_reuse_preprocessed": true,
+                "drift_only_export": false
             },
             "hidden_items": [
                 "tag:motilitometer_prep_grp_714",
@@ -91,23 +95,21 @@
             "uuid": "715",
             "pos": [
                 56.015625,
-                2.29459659511473
+                2.2757697456492636
             ],
             "size": [
                 43.9453125,
-                52.92376017764619
+                52.878179384203484
             ],
             "visible": true,
             "params": {
                 "label": "Video Viewer",
                 "fps_counter_enabled": true,
-                "use_rgba": false,
-                "texture_mode": "raw",
-                "preserve_aspect_ratio": false
+                "use_rgba": false
             },
             "node_pos": [
-                1072,
-                7
+                1543,
+                8
             ],
             "hidden_items": []
         },
@@ -117,24 +119,24 @@
             "uuid": "717",
             "pos": [
                 56.015625,
-                55.662472242783124
+                55.62248995983936
             ],
             "size": [
                 43.828125,
-                43.89341228719467
+                43.84203480589023
             ],
             "visible": true,
             "params": {
                 "label": "Lineplot",
                 "autoscale": true,
                 "smooth": true,
-                "smooth_window": 5,
+                "smooth_window": 50,
                 "log_x": false,
-                "smooth_algo": "Rolling Median"
+                "smooth_algo": "Rolling Mean"
             },
             "node_pos": [
-                1277,
-                164
+                1288,
+                161
             ],
             "hidden_items": [
                 "tag:closest_point_anot_717"
@@ -146,11 +148,11 @@
             "uuid": "718",
             "pos": [
                 0.15625,
-                55.662472242783124
+                55.62248995983936
             ],
             "size": [
                 13.359375000000002,
-                43.96743153219837
+                43.84203480589023
             ],
             "visible": false,
             "params": {
@@ -169,11 +171,11 @@
             "uuid": "1053",
             "pos": [
                 0.1171875,
-                2.516654330125833
+                2.4096385542168677
             ],
             "size": [
                 22.3046875,
-                52.84974093264248
+                52.81124497991968
             ],
             "visible": false,
             "params": {
@@ -181,7 +183,7 @@
                 "recursive": true,
                 "reprocess": true,
                 "file_format": "All",
-                "folder": "C:\\Users\\gerva\\OneDrive\\SowftwareX"
+                "folder": "D:\\20261029"
             },
             "node_pos": [
                 218,
@@ -195,15 +197,18 @@
             "uuid": "1282",
             "pos": [
                 0.15625,
-                2.516654330125833
+                2.4096385542168677
             ],
             "size": [
                 24.1796875,
-                36.26943005181347
+                36.21151271753681
             ],
             "visible": true,
             "params": {
-                "label": "Seecam"
+                "label": "Seecam",
+                "cam_name": "Integrated Camera",
+                "acquisition_mode": "continuous",
+                "depth_mode": "Auto"
             },
             "node_pos": [
                 64,
@@ -217,11 +222,11 @@
             "uuid": "1400",
             "pos": [
                 0.1171875,
-                39.15618060695781
+                39.0227576974565
             ],
             "size": [
                 24.3359375,
-                38.6380458919319
+                38.62115127175368
             ],
             "visible": true,
             "params": {
@@ -267,7 +272,7 @@
             "uuid": "1498",
             "pos": [
                 0.390625,
-                0.6661732050333087
+                0.6024096385542169
             ],
             "size": [
                 0.0,
@@ -290,11 +295,11 @@
             "uuid": "1523",
             "pos": [
                 24.4140625,
-                2.516654330125833
+                2.4096385542168677
             ],
             "size": [
                 31.5625,
-                36.565507031828275
+                36.54618473895582
             ],
             "visible": true,
             "params": {
@@ -312,11 +317,11 @@
             "uuid": "1543",
             "pos": [
                 0.15625,
-                78.09030347890452
+                78.045515394913
             ],
             "size": [
                 24.1796875,
-                21.61361954108068
+                21.485943775100402
             ],
             "visible": true,
             "params": {
@@ -328,7 +333,7 @@
                 "bitrate_mbps": 8.0,
                 "sync_mode": "Realtime (Drop / Duplicate)",
                 "bitdepth_mode": "8-bit Tone-mapped (Universal MP4)",
-                "output_dir": "C:\\Users\\gerva\\OneDrive\\SowftwareX",
+                "output_dir": "D:\\20261029",
                 "file_prefix": "recording"
             },
             "node_pos": [
@@ -343,11 +348,11 @@
             "uuid": "1599",
             "pos": [
                 13.6328125,
-                55.662472242783124
+                55.62248995983936
             ],
             "size": [
-                23.4765625,
-                44.04145077720207
+                19.453125,
+                43.97590361445783
             ],
             "visible": false,
             "params": {
@@ -370,8 +375,8 @@
                 "dpi": 100
             },
             "node_pos": [
-                1076,
-                286
+                1289,
+                311
             ],
             "hidden_items": []
         },
@@ -380,12 +385,12 @@
             "class_name": "MotilityReprocessor_win",
             "uuid": "1952",
             "pos": [
-                1.953125,
-                3.7009622501850483
+                22.5,
+                2.4096385542168677
             ],
             "size": [
-                14.84375,
-                25.166543301258326
+                32.5,
+                52.878179384203484
             ],
             "visible": false,
             "params": {
@@ -394,13 +399,179 @@
                 "show_vector": true,
                 "vector_scale": 1.0,
                 "x_axis_mode": "Fixed \u0394T",
-                "delta_t": 0.03333333333333333
+                "delta_t": 0.03333333507180214,
+                "show_drift_vector": true,
+                "show_fake_drifters": false,
+                "emit_drift_series": true,
+                "view_mode": "Manip",
+                "emit_phototaxis_series": true,
+                "pi_preset": "Half-Plane (0\u00b0-180\u00b0 / 180\u00b0-360\u00b0)",
+                "pi_up_min": 0.0,
+                "pi_up_max": 180.0,
+                "pi_down_min": 180.0,
+                "pi_down_max": 360.0,
+                "pi_weight_speed": true
             },
             "node_pos": [
-                560,
-                342
+                564,
+                394
             ],
-            "hidden_items": []
+            "hidden_items": [
+                "tag:motreproc_drift_grp_1952"
+            ]
+        },
+        {
+            "module": "Motilitometer.motility_simulator.motility_simulator_win",
+            "class_name": "MotilitySimulator_win",
+            "uuid": "2177",
+            "pos": [
+                0.078125,
+                2.208835341365462
+            ],
+            "size": [
+                22.3828125,
+                53.21285140562249
+            ],
+            "visible": false,
+            "params": {
+                "label": "Motility Simulator",
+                "export_dir": "C:\\Users\\gerva\\MotilitySimulator",
+                "export_name": "synthetic",
+                "export_format": "AVI lossless (FFV1)",
+                "last_preset": "Sedimentation_And_Drift.json",
+                "width": 1280,
+                "height": 720,
+                "fps": 30.0,
+                "calibration": 0.7575,
+                "duration_s": 0.0,
+                "seed": 0,
+                "realtime": true,
+                "sensor_noise": 0.5,
+                "bg_mode": "Solid color",
+                "bg_color": [
+                    232,
+                    252,
+                    232
+                ],
+                "bg_image": "C:/Users/gerva/OneDrive/SowftwareX/CoralFrag_test_RAW.png",
+                "blur_bg": false,
+                "n_individuals": 200,
+                "non_motile_pct": 10.0,
+                "speed_mean": 150.0,
+                "speed_std": 10.0,
+                "size_mean": 10.0,
+                "size_std": 1.5,
+                "sprite_mode": "Circle",
+                "color": [
+                    35,
+                    140,
+                    50
+                ],
+                "sprite_png": "",
+                "opacity": 100.0,
+                "tex_noise": 35.0,
+                "tex_grain": 1.0,
+                "rotate_with_heading": false,
+                "boundary": "Disappear & respawn",
+                "collisions": true,
+                "adhesion": false,
+                "adhesion_prob": 100.0,
+                "intention_mode": "Random (per individual)",
+                "intention_angle": 0.0,
+                "intention_spread": 20.0,
+                "intention_strength": 80.0,
+                "turn_gain": 0.15,
+                "turn_noise": 4.5,
+                "helical": false,
+                "helix_period": 1.0,
+                "helix_amp": 0.5,
+                "chirality": "Random",
+                "brownian": 0.2,
+                "photo_angle": 81.0,
+                "photo_strength": 0.0,
+                "drift_on": true,
+                "drift_angle": 270.0,
+                "drift_speed": 5.0,
+                "drift_motile_pct": 100.0,
+                "focus_blur": 0.0,
+                "oof_pct": 25.0,
+                "oof_blur": 9.0,
+                "shock_intensity": 75.0,
+                "shock_duration": 1.0,
+                "shock_times": "",
+                "update_with_input": true,
+                "overlay_view_mode": "Simulation",
+                "sync_count": false,
+                "x_axis_mode": "Fixed \u0394T",
+                "delta_t": 0.03333333333333333
+            },
+            "hidden_items": [
+                "tag:msg_bg_image_2177",
+                "tag:msg_sprite_png_2177",
+                "tag:msg_adhesion_prob_2177",
+                "tag:msg_intention_angle_2177",
+                "tag:msg_intention_spread_2177",
+                "tag:msg_helix_period_2177",
+                "tag:msg_helix_amp_2177",
+                "tag:msg_chirality_2177",
+                "tag:msg_oof_blur_2177"
+            ],
+            "node_pos": [
+                871,
+                704
+            ]
+        },
+        {
+            "module": "plot.polar_spectrogram_win",
+            "class_name": "PolarSpectrogramWin",
+            "uuid": "2598",
+            "pos": [
+                33.1640625,
+                55.55555555555556
+            ],
+            "size": [
+                21.796875,
+                44.17670682730924
+            ],
+            "visible": false,
+            "params": {
+                "label": "Polar Spectrogram",
+                "history_size": 5399,
+                "fps": 30.0,
+                "delta_t": 0.020833333333333332,
+                "auto_delta_t": false,
+                "num_bins": 72,
+                "orientation": "Horizontal (Time ->)",
+                "weight_by_magnitude": false,
+                "temporal_window": 1,
+                "smooth_time": 5.0,
+                "smooth_angle": 0.0,
+                "interpolation": "gaussian",
+                "mean_curve_smooth": 10,
+                "show_mean_curve": false,
+                "show_division": false,
+                "invert_y": true,
+                "color_mode": "Colormap",
+                "colormap": "turbo",
+                "normalization": "Frame Density (%)",
+                "theme_mode": "Auto",
+                "plot_title": "",
+                "rolling_mode": false,
+                "is_paused": false,
+                "canvas_width": 1100,
+                "canvas_height": 650,
+                "dpi": 100,
+                "color_scale_mode": "Manual",
+                "color_vmin": 1.0,
+                "color_vmax": 10.0
+            },
+            "node_pos": [
+                1289,
+                455
+            ],
+            "hidden_items": [
+                "tag:spectro_hist_2598"
+            ]
         }
     ],
     "connections": [
@@ -441,6 +612,11 @@
         },
         {
             "from": "1053",
+            "output": "Trigger",
+            "to": "2598"
+        },
+        {
+            "from": "1053",
             "output": "File Path",
             "to": "714"
         },
@@ -472,7 +648,17 @@
         {
             "from": "1952",
             "output": "Frame",
-            "to": "715"
+            "to": "2523"
+        },
+        {
+            "from": "1952",
+            "output": "Frame",
+            "to": "2537"
+        },
+        {
+            "from": "1952",
+            "output": "CMD",
+            "to": "2553"
         },
         {
             "from": "1952",
@@ -483,6 +669,26 @@
             "from": "1952",
             "output": "Vectors",
             "to": "2089"
+        },
+        {
+            "from": "2177",
+            "output": "Frame",
+            "to": "16058"
+        },
+        {
+            "from": "2177",
+            "output": "Frame",
+            "to": "554645"
+        },
+        {
+            "from": "2177",
+            "output": "Result",
+            "to": "16072"
+        },
+        {
+            "from": "2177",
+            "output": "Vectors",
+            "to": "16086"
         }
     ],
     "views": {
@@ -494,11 +700,11 @@
                     "label": "Motilitometer Tracker",
                     "pos": [
                         24.53125,
-                        39.30421909696521
+                        39.2904953145917
                     ],
                     "size": [
                         31.406250000000004,
-                        60.029607698001485
+                        59.97322623828648
                     ],
                     "hidden_items": [
                         "tag:motilitometer_prep_grp_714",
@@ -518,11 +724,11 @@
                     "label": "Video Viewer",
                     "pos": [
                         56.015625,
-                        2.29459659511473
+                        2.2757697456492636
                     ],
                     "size": [
                         43.9453125,
-                        52.92376017764619
+                        52.878179384203484
                     ]
                 },
                 {
@@ -530,11 +736,11 @@
                     "label": "Lineplot",
                     "pos": [
                         56.015625,
-                        55.662472242783124
+                        55.62248995983936
                     ],
                     "size": [
                         43.828125,
-                        43.89341228719467
+                        43.84203480589023
                     ],
                     "hidden_items": [
                         "tag:closest_point_anot_717"
@@ -545,11 +751,11 @@
                     "label": "Seecam",
                     "pos": [
                         0.15625,
-                        2.516654330125833
+                        2.4096385542168677
                     ],
                     "size": [
                         24.1796875,
-                        36.26943005181347
+                        36.21151271753681
                     ]
                 },
                 {
@@ -557,11 +763,11 @@
                     "label": "Light Controller",
                     "pos": [
                         0.1171875,
-                        39.15618060695781
+                        39.0227576974565
                     ],
                     "size": [
                         24.3359375,
-                        38.6380458919319
+                        38.62115127175368
                     ]
                 },
                 {
@@ -569,11 +775,11 @@
                     "label": "Sequence writer",
                     "pos": [
                         24.4140625,
-                        2.516654330125833
+                        2.4096385542168677
                     ],
                     "size": [
                         31.5625,
-                        36.565507031828275
+                        36.54618473895582
                     ]
                 },
                 {
@@ -581,11 +787,11 @@
                     "label": "Video Writer",
                     "pos": [
                         0.15625,
-                        78.09030347890452
+                        78.045515394913
                     ],
                     "size": [
                         24.1796875,
-                        21.61361954108068
+                        21.485943775100402
                     ]
                 }
             ],
@@ -621,6 +827,34 @@
                 "2281": {
                     "is_open": false,
                     "label": "PlaybackRP"
+                },
+                "2523": {
+                    "is_open": false,
+                    "label": "FrameRPS"
+                },
+                "2537": {
+                    "is_open": false,
+                    "label": "FrameRP"
+                },
+                "2553": {
+                    "is_open": false,
+                    "label": "CMDRP"
+                },
+                "16058": {
+                    "is_open": false,
+                    "label": "FrameSim"
+                },
+                "16072": {
+                    "is_open": false,
+                    "label": "ResultSim"
+                },
+                "16086": {
+                    "is_open": false,
+                    "label": "VectSim"
+                },
+                "554645": {
+                    "is_open": false,
+                    "label": "FrameSimProc"
                 }
             }
         },
@@ -632,11 +866,11 @@
                     "label": "Motilitometer Tracker",
                     "pos": [
                         22.5390625,
-                        2.29459659511473
+                        2.2757697456492636
                     ],
                     "size": [
                         32.6171875,
-                        52.99777942264989
+                        52.945113788487284
                     ],
                     "hidden_items": [
                         "tag:motilitometer_prep_grp_714",
@@ -656,26 +890,23 @@
                     "label": "Video Viewer",
                     "pos": [
                         55.2734375,
-                        2.29459659511473
+                        2.2757697456492636
                     ],
                     "size": [
                         44.6875,
-                        52.92376017764619
+                        52.878179384203484
                     ]
                 },
                 {
                     "uuid": "717",
                     "label": "Lineplot",
                     "pos": [
-                        37.2265625,
-                        55.662472242783124
+                        54.96093749999999,
+                        55.62248995983936
                     ],
                     "size": [
-                        62.61718750000001,
-                        43.89341228719467
-                    ],
-                    "hidden_items": [
-                        "tag:closest_point_anot_717"
+                        44.8828125,
+                        43.84203480589023
                     ]
                 },
                 {
@@ -683,11 +914,11 @@
                     "label": "Sample Container",
                     "pos": [
                         0.15625,
-                        55.662472242783124
+                        55.62248995983936
                     ],
                     "size": [
                         13.359375000000002,
-                        43.89341228719467
+                        43.84203480589023
                     ]
                 },
                 {
@@ -695,11 +926,11 @@
                     "label": "Video Reader",
                     "pos": [
                         0.1171875,
-                        2.516654330125833
+                        2.4096385542168677
                     ],
                     "size": [
                         22.3046875,
-                        52.84974093264248
+                        52.81124497991968
                     ]
                 },
                 {
@@ -707,11 +938,23 @@
                     "label": "Polar Plot",
                     "pos": [
                         13.6328125,
-                        55.662472242783124
+                        55.62248995983936
                     ],
                     "size": [
-                        23.4765625,
-                        44.04145077720207
+                        19.453125,
+                        43.97590361445783
+                    ]
+                },
+                {
+                    "uuid": "2598",
+                    "label": "Polar Spectrogram",
+                    "pos": [
+                        33.1640625,
+                        55.55555555555556
+                    ],
+                    "size": [
+                        21.796875,
+                        44.17670682730924
                     ]
                 }
             ],
@@ -747,6 +990,34 @@
                 "2281": {
                     "is_open": false,
                     "label": "PlaybackRP"
+                },
+                "2523": {
+                    "is_open": false,
+                    "label": "FrameRPS"
+                },
+                "2537": {
+                    "is_open": false,
+                    "label": "FrameRP"
+                },
+                "2553": {
+                    "is_open": false,
+                    "label": "CMDRP"
+                },
+                "16058": {
+                    "is_open": false,
+                    "label": "FrameSim"
+                },
+                "16072": {
+                    "is_open": false,
+                    "label": "ResultSim"
+                },
+                "16086": {
+                    "is_open": false,
+                    "label": "VectSim"
+                },
+                "554645": {
+                    "is_open": false,
+                    "label": "FrameSimProc"
                 }
             }
         },
@@ -758,23 +1029,23 @@
                     "label": "Video Viewer",
                     "pos": [
                         55.078125,
-                        2.29459659511473
+                        2.2757697456492636
                     ],
                     "size": [
                         44.8828125,
-                        53.21983715766099
+                        53.21285140562249
                     ]
                 },
                 {
                     "uuid": "717",
                     "label": "Lineplot",
                     "pos": [
-                        37.2265625,
-                        55.662472242783124
+                        55.1171875,
+                        55.62248995983936
                     ],
                     "size": [
-                        62.61718750000001,
-                        43.89341228719467
+                        44.7265625,
+                        43.84203480589023
                     ],
                     "hidden_items": [
                         "tag:closest_point_anot_717"
@@ -785,11 +1056,11 @@
                     "label": "Sample Container",
                     "pos": [
                         0.15625,
-                        55.662472242783124
+                        55.62248995983936
                     ],
                     "size": [
                         13.359375000000002,
-                        43.89341228719467
+                        43.84203480589023
                     ]
                 },
                 {
@@ -797,11 +1068,11 @@
                     "label": "Video Reader",
                     "pos": [
                         0.1171875,
-                        2.516654330125833
+                        2.4096385542168677
                     ],
                     "size": [
                         22.3046875,
-                        52.84974093264248
+                        52.81124497991968
                     ]
                 },
                 {
@@ -809,11 +1080,11 @@
                     "label": "Polar Plot",
                     "pos": [
                         13.6328125,
-                        55.662472242783124
+                        55.62248995983936
                     ],
                     "size": [
-                        23.4765625,
-                        44.04145077720207
+                        19.453125,
+                        43.97590361445783
                     ]
                 },
                 {
@@ -821,11 +1092,26 @@
                     "label": "Motility Reprocessor",
                     "pos": [
                         22.5,
-                        2.4426350851221317
+                        2.4096385542168677
                     ],
                     "size": [
                         32.5,
-                        52.92376017764619
+                        52.878179384203484
+                    ],
+                    "hidden_items": [
+                        "tag:motreproc_drift_grp_1952"
+                    ]
+                },
+                {
+                    "uuid": "2598",
+                    "label": "Polar Spectrogram",
+                    "pos": [
+                        33.1640625,
+                        55.55555555555556
+                    ],
+                    "size": [
+                        21.796875,
+                        44.17670682730924
                     ]
                 }
             ],
@@ -861,6 +1147,375 @@
                 "2281": {
                     "is_open": true,
                     "label": "PlaybackRP"
+                },
+                "2523": {
+                    "is_open": false,
+                    "label": "FrameRPS"
+                },
+                "2537": {
+                    "is_open": true,
+                    "label": "FrameRP"
+                },
+                "2553": {
+                    "is_open": false,
+                    "label": "CMDRP"
+                },
+                "16058": {
+                    "is_open": false,
+                    "label": "FrameSim"
+                },
+                "16072": {
+                    "is_open": false,
+                    "label": "ResultSim"
+                },
+                "16086": {
+                    "is_open": false,
+                    "label": "VectSim"
+                },
+                "554645": {
+                    "is_open": false,
+                    "label": "FrameSimProc"
+                }
+            }
+        },
+        "Motility simulator": {
+            "is_relative": true,
+            "windows": [
+                {
+                    "uuid": "714",
+                    "label": "Motilitometer Tracker",
+                    "pos": [
+                        22.5390625,
+                        2.2757697456492636
+                    ],
+                    "size": [
+                        32.6171875,
+                        52.945113788487284
+                    ],
+                    "hidden_items": [
+                        "tag:motilitometer_prep_grp_714",
+                        "tag:motilitometer_crop_circ_grp_714",
+                        "tag:motilitometer_crop_square_grp_714",
+                        "tag:motilitometer_crop_rect_grp_714",
+                        "tag:motilitometer_crop_abs_center_grp_714",
+                        "tag:motilitometer_static_grp_714",
+                        "tag:motilitometer_focus_grp_714",
+                        "tag:motilitometer_both_group_714",
+                        "tag:motilitometer_df_group_714",
+                        "tag:motilitometer_df_hm_settings_grp_714",
+                        "tag:motilitometer_df_hm_custom_grp_714",
+                        "tag:motilitometer_df_arrows_grp_714",
+                        "tag:motilitometer_ws_group_714",
+                        "tag:motilitometer_drift_group_714",
+                        "tag:motilitometer_drift_hint_grp_714",
+                        "tag:motilitometer_drift_hint_ang_grp_714",
+                        "tag:motilitometer_drift_ranges_grp_714",
+                        "tag:batch_progress_group_714"
+                    ]
+                },
+                {
+                    "uuid": "715",
+                    "label": "Video Viewer",
+                    "pos": [
+                        55.2734375,
+                        2.2757697456492636
+                    ],
+                    "size": [
+                        44.6875,
+                        52.878179384203484
+                    ]
+                },
+                {
+                    "uuid": "717",
+                    "label": "Lineplot",
+                    "pos": [
+                        55.078125,
+                        55.62248995983936
+                    ],
+                    "size": [
+                        44.765625,
+                        43.84203480589023
+                    ],
+                    "hidden_items": [
+                        "tag:closest_point_anot_717"
+                    ]
+                },
+                {
+                    "uuid": "718",
+                    "label": "Sample Container",
+                    "pos": [
+                        0.15625,
+                        55.62248995983936
+                    ],
+                    "size": [
+                        13.359375000000002,
+                        43.84203480589023
+                    ]
+                },
+                {
+                    "uuid": "1599",
+                    "label": "Polar Plot",
+                    "pos": [
+                        13.6328125,
+                        55.62248995983936
+                    ],
+                    "size": [
+                        19.453125,
+                        43.97590361445783
+                    ]
+                },
+                {
+                    "uuid": "2177",
+                    "label": "Motility Simulator",
+                    "pos": [
+                        0.078125,
+                        2.208835341365462
+                    ],
+                    "size": [
+                        22.3828125,
+                        53.21285140562249
+                    ],
+                    "hidden_items": [
+                        "tag:msg_bg_image_2177",
+                        "tag:msg_sprite_png_2177",
+                        "tag:msg_adhesion_prob_2177",
+                        "tag:msg_intention_angle_2177",
+                        "tag:msg_intention_spread_2177",
+                        "tag:msg_helix_period_2177",
+                        "tag:msg_helix_amp_2177",
+                        "tag:msg_chirality_2177",
+                        "tag:msg_oof_blur_2177"
+                    ]
+                },
+                {
+                    "uuid": "2598",
+                    "label": "Polar Spectrogram",
+                    "pos": [
+                        33.1640625,
+                        55.55555555555556
+                    ],
+                    "size": [
+                        21.796875,
+                        44.17670682730924
+                    ]
+                }
+            ],
+            "gates": {
+                "1327": {
+                    "is_open": false,
+                    "label": "Cam"
+                },
+                "2014": {
+                    "is_open": false,
+                    "label": "FrameRT"
+                },
+                "2029": {
+                    "is_open": true,
+                    "label": "ResultRT"
+                },
+                "2044": {
+                    "is_open": true,
+                    "label": "VectorsRT"
+                },
+                "2059": {
+                    "is_open": false,
+                    "label": "FrameRP"
+                },
+                "2074": {
+                    "is_open": false,
+                    "label": "RestulRP"
+                },
+                "2089": {
+                    "is_open": false,
+                    "label": "VectorsRP"
+                },
+                "2281": {
+                    "is_open": false,
+                    "label": "PlaybackRP"
+                },
+                "2523": {
+                    "is_open": false,
+                    "label": "FrameRPS"
+                },
+                "2537": {
+                    "is_open": false,
+                    "label": "FrameRP"
+                },
+                "2553": {
+                    "is_open": false,
+                    "label": "CMDRP"
+                },
+                "16058": {
+                    "is_open": false,
+                    "label": "FrameSim"
+                },
+                "16072": {
+                    "is_open": false,
+                    "label": "ResultSim"
+                },
+                "16086": {
+                    "is_open": false,
+                    "label": "VectSim"
+                },
+                "554645": {
+                    "is_open": true,
+                    "label": "FrameSimProc"
+                }
+            }
+        },
+        "Video sim. reprocess.": {
+            "is_relative": true,
+            "windows": [
+                {
+                    "uuid": "715",
+                    "label": "Video Viewer",
+                    "pos": [
+                        55.078125,
+                        2.2757697456492636
+                    ],
+                    "size": [
+                        44.8828125,
+                        53.21285140562249
+                    ]
+                },
+                {
+                    "uuid": "717",
+                    "label": "Lineplot",
+                    "pos": [
+                        55.1171875,
+                        55.62248995983936
+                    ],
+                    "size": [
+                        44.7265625,
+                        43.84203480589023
+                    ]
+                },
+                {
+                    "uuid": "718",
+                    "label": "Sample Container",
+                    "pos": [
+                        0.15625,
+                        55.62248995983936
+                    ],
+                    "size": [
+                        13.359375000000002,
+                        43.84203480589023
+                    ]
+                },
+                {
+                    "uuid": "1053",
+                    "label": "Video Reader",
+                    "pos": [
+                        0.1171875,
+                        2.4096385542168677
+                    ],
+                    "size": [
+                        22.3046875,
+                        52.81124497991968
+                    ]
+                },
+                {
+                    "uuid": "1952",
+                    "label": "Motility Reprocessor",
+                    "pos": [
+                        22.5,
+                        2.4096385542168677
+                    ],
+                    "size": [
+                        32.5,
+                        52.878179384203484
+                    ],
+                    "hidden_items": [
+                        "tag:motreproc_drift_grp_1952"
+                    ]
+                },
+                {
+                    "uuid": "2177",
+                    "label": "Motility Simulator",
+                    "pos": [
+                        13.750000000000002,
+                        55.48862115127176
+                    ],
+                    "size": [
+                        41.25,
+                        43.97590361445783
+                    ],
+                    "hidden_items": [
+                        "tag:msg_bg_color_2177",
+                        "tag:msg_bg_image_2177",
+                        "tag:msg_sprite_png_2177",
+                        "tag:msg_adhesion_prob_2177",
+                        "tag:msg_intention_angle_2177",
+                        "tag:msg_intention_spread_2177",
+                        "tag:msg_helix_period_2177",
+                        "tag:msg_helix_amp_2177",
+                        "tag:msg_chirality_2177",
+                        "tag:msg_drift_angle_2177",
+                        "tag:msg_drift_speed_2177",
+                        "tag:msg_drift_motile_pct_2177"
+                    ]
+                }
+            ],
+            "gates": {
+                "1327": {
+                    "is_open": false,
+                    "label": "Cam"
+                },
+                "2014": {
+                    "is_open": false,
+                    "label": "FrameRT"
+                },
+                "2029": {
+                    "is_open": false,
+                    "label": "ResultRT"
+                },
+                "2044": {
+                    "is_open": false,
+                    "label": "VectorsRT"
+                },
+                "2059": {
+                    "is_open": true,
+                    "label": "FrameRP"
+                },
+                "2074": {
+                    "is_open": true,
+                    "label": "RestulRP"
+                },
+                "2089": {
+                    "is_open": true,
+                    "label": "VectorsRP"
+                },
+                "2281": {
+                    "is_open": true,
+                    "label": "PlaybackRP"
+                },
+                "2523": {
+                    "is_open": true,
+                    "label": "FrameRPS"
+                },
+                "2537": {
+                    "is_open": false,
+                    "label": "FrameRP"
+                },
+                "2553": {
+                    "is_open": true,
+                    "label": "CMDRP"
+                },
+                "16058": {
+                    "is_open": true,
+                    "label": "FrameSim"
+                },
+                "16072": {
+                    "is_open": true,
+                    "label": "ResultSim"
+                },
+                "16086": {
+                    "is_open": false,
+                    "label": "VectSim"
+                },
+                "554645": {
+                    "is_open": false,
+                    "label": "FrameSimProc"
                 }
             }
         }
@@ -909,7 +1564,7 @@
             "kind": "gate",
             "uuid": "2014",
             "label": "FrameRT",
-            "is_open": true,
+            "is_open": false,
             "io_type": "FRAME",
             "node_pos": [
                 394,
@@ -952,12 +1607,13 @@
             "is_open": true,
             "io_type": "VECTORS",
             "node_pos": [
-                871,
-                163
+                870,
+                175
             ],
             "connections": {
                 "Out": [
-                    "1599"
+                    "1599",
+                    "2598"
                 ]
             },
             "incoming": {
@@ -973,7 +1629,7 @@
             "io_type": "FRAME",
             "node_pos": [
                 393,
-                233
+                226
             ],
             "connections": {
                 "Out": [
@@ -993,7 +1649,7 @@
             "io_type": "SAMPLE",
             "node_pos": [
                 871,
-                338
+                347
             ],
             "connections": {
                 "Out": [
@@ -1012,12 +1668,13 @@
             "is_open": false,
             "io_type": "VECTORS",
             "node_pos": [
-                869,
-                502
+                871,
+                521
             ],
             "connections": {
                 "Out": [
-                    "1599"
+                    "1599",
+                    "2598"
                 ]
             },
             "incoming": {
@@ -1029,7 +1686,7 @@
             "kind": "gate",
             "uuid": "2281",
             "label": "PlaybackRP",
-            "is_open": true,
+            "is_open": false,
             "io_type": "PLAYBACK",
             "node_pos": [
                 394,
@@ -1043,6 +1700,147 @@
             "incoming": {
                 "source_uuid": "1053",
                 "output_key": "Playback"
+            }
+        },
+        {
+            "kind": "gate",
+            "uuid": "2523",
+            "label": "FrameRPS",
+            "is_open": false,
+            "io_type": "FRAME",
+            "node_pos": [
+                712,
+                702
+            ],
+            "connections": {
+                "Out": [
+                    "2177"
+                ]
+            },
+            "incoming": {
+                "source_uuid": "1952",
+                "output_key": "Frame"
+            }
+        },
+        {
+            "kind": "gate",
+            "uuid": "2537",
+            "label": "FrameRP",
+            "is_open": false,
+            "io_type": "FRAME",
+            "node_pos": [
+                1076,
+                431
+            ],
+            "connections": {
+                "Out": [
+                    "715"
+                ]
+            },
+            "incoming": {
+                "source_uuid": "1952",
+                "output_key": "Frame"
+            }
+        },
+        {
+            "kind": "gate",
+            "uuid": "2553",
+            "label": "CMDRP",
+            "is_open": false,
+            "io_type": "CMD_DICT",
+            "node_pos": [
+                563,
+                701
+            ],
+            "connections": {
+                "Out": [
+                    "2177"
+                ]
+            },
+            "incoming": {
+                "source_uuid": "1952",
+                "output_key": "CMD"
+            }
+        },
+        {
+            "kind": "gate",
+            "uuid": "16058",
+            "label": "FrameSim",
+            "is_open": false,
+            "io_type": "FRAME",
+            "node_pos": [
+                1148,
+                649
+            ],
+            "connections": {
+                "Out": [
+                    "715"
+                ]
+            },
+            "incoming": {
+                "source_uuid": "2177",
+                "output_key": "Frame"
+            }
+        },
+        {
+            "kind": "gate",
+            "uuid": "16072",
+            "label": "ResultSim",
+            "is_open": false,
+            "io_type": "SAMPLE",
+            "node_pos": [
+                1149,
+                824
+            ],
+            "connections": {
+                "Out": [
+                    "718"
+                ]
+            },
+            "incoming": {
+                "source_uuid": "2177",
+                "output_key": "Result"
+            }
+        },
+        {
+            "kind": "gate",
+            "uuid": "16086",
+            "label": "VectSim",
+            "is_open": false,
+            "io_type": "VECTORS",
+            "node_pos": [
+                1149,
+                997
+            ],
+            "connections": {
+                "Out": [
+                    "1599",
+                    "2598"
+                ]
+            },
+            "incoming": {
+                "source_uuid": "2177",
+                "output_key": "Vectors"
+            }
+        },
+        {
+            "kind": "gate",
+            "uuid": "554645",
+            "label": "FrameSimProc",
+            "is_open": false,
+            "io_type": "FRAME",
+            "node_pos": [
+                1306,
+                650
+            ],
+            "connections": {
+                "Out": [
+                    "714"
+                ]
+            },
+            "incoming": {
+                "source_uuid": "2177",
+                "output_key": "Frame"
             }
         }
     ]
