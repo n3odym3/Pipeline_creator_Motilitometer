@@ -1,0 +1,98 @@
+{
+    "description": "Video Processing Layout Overview",
+    "steps": [
+        {
+            "path": [],
+            "instruction": "Welcome to the Video Processing workspace!\nThis layout is designed for analyzing and batch-processing pre-recorded video datasets.",
+            "dim": true,
+            "type": "center",
+            "links": [],
+            "view": "Video processing"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Video Reader",
+                    "tag": 834,
+                    "alias": "video_reader_win_1053"
+                }
+            ],
+            "instruction": "Video Reader:\nBrowse experiment folders, manage video queues, and control playback for individual or batch analysis.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Motilitometer Tracker",
+                    "tag": 512,
+                    "alias": "Motilitometer Tracker_714"
+                }
+            ],
+            "instruction": "Motilitometer Tracker:\nFine-tune detection parameters, image preprocessing, and tracking algorithms to extract motion metrics.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Video Viewer",
+                    "tag": 759,
+                    "alias": "Video Viewer_715"
+                }
+            ],
+            "instruction": "Video Viewer:\nPlays the active video while displaying real-time detection overlays, trajectories, and tracking bounding boxes.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Sample Container",
+                    "tag": 809,
+                    "alias": "Sample Container_718"
+                }
+            ],
+            "instruction": "Sample Container:\nCollects, organizes, and stores extracted data runs, allowing you to inspect datasets and export them to CSV.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Lineplot",
+                    "tag": 776,
+                    "alias": "Lineplot_717"
+                }
+            ],
+            "instruction": "Lineplot:\nGraphs time-series metrics (such as speed, displacement, or counts) for selected samples in the container.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Polar Plot",
+                    "tag": 1074,
+                    "alias": "Polar Plot_1599"
+                }
+            ],
+            "instruction": "Polar Plot:\nDisplays movement directionality and angular vector distributions to reveal sample orientation preferences or biases.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [],
+            "instruction": "You are now familiar with the Video Processing layout!\nLoad a video directory in the Video Reader to begin your analyses.",
+            "dim": true,
+            "type": "center",
+            "links": []
+        }
+    ]
+}

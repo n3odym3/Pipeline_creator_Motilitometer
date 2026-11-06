@@ -1,0 +1,115 @@
+{
+    "description": "Video Recording Layout Overview",
+    "steps": [
+        {
+            "path": [],
+            "instruction": "Welcome to Motilitometer!\nIn this quick tour, we will explore the Video Recording workspace and see how the modules work together.",
+            "dim": true,
+            "type": "center"
+        },
+        {
+            "path": [],
+            "instruction": "This overview covers the general workspace layout.\nFor in-depth settings and options, check out the dedicated tutorial for each module.",
+            "dim": true,
+            "type": "center"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Seecam",
+                    "tag": 912,
+                    "alias": "Seecam_1282"
+                }
+            ],
+            "instruction": "Seecam:\nControls the microscope camera, displays the live video stream, and lets you adjust exposure and acquisition settings.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Light Controller",
+                    "tag": 943,
+                    "alias": "Light Controller_1400"
+                }
+            ],
+            "instruction": "Light Controller:\nControls microscope illumination, including RGB, White, and Infrared channels, as well as pulse modes.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Video Writer",
+                    "tag": 1043,
+                    "alias": "video_writer_win_1543"
+                }
+            ],
+            "instruction": "Video Writer:\nSaves live recordings to disk, handling file formats, output paths, and recording triggers.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Sequence writer",
+                    "tag": 1034,
+                    "alias": "Sequence writer_1523"
+                }
+            ],
+            "instruction": "Sequence Writer:\nAutomates your experiments by scheduling synchronized light stimulation protocols and video recordings.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Motilitometer Tracker",
+                    "tag": 507,
+                    "alias": "Motilitometer Tracker_714"
+                }
+            ],
+            "instruction": "Motilitometer Tracker:\nAnalyzes video frames in real time to detect specimens and measure motility metrics like speed, direction, and trajectory.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Video Viewer",
+                    "tag": 754,
+                    "alias": "Video Viewer_715"
+                }
+            ],
+            "instruction": "Video Viewer:\nShows the real-time video feed along with live tracking overlays and detection markers.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Lineplot",
+                    "tag": 771,
+                    "alias": "Lineplot_717"
+                }
+            ],
+            "instruction": "Lineplot:\nPlots motility data live over time, providing instant visual feedback on your sample's behavior.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [],
+            "instruction": "You are now familiar with the Video Recording layout!\nYou can start experimenting or launch a module-specific tutorial for deeper configuration.",
+            "dim": true,
+            "type": "center",
+            "view": "Video recording"
+        }
+    ]
+}

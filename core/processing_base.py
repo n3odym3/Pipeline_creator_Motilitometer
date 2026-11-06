@@ -1,0 +1,238 @@
+from __future__ import annotations
+
+import multiprocessing as mp
+import queue
+from typing import Any, Dict, Optional, Tuple
+
+from loguru import logger
+
+
+class ProcessingBase:
+    """
+    Base class for multiprocessing-based data processing modules.
+
+    This class manages a background worker process that receives data via an input queue,
+    processes it using a subclass-defined `_process_data()` method, and returns the result
+    via an output queue.
+
+    Supports different queue drop policies and runtime parameter updates.
+    """
+    buffer_size: int = 10
+    drop_policy: str = "drop_new"
+    daemon: bool = True
+
+    def __init__(
+        self,
+        params: Optional[Dict[str, Any]] = None,
+        *,
+        buffer_size: Optional[int] = None,
+        drop_policy: Optional[str] = None,
+        daemon: Optional[bool] = None,
+        **kwargs: Any,
+    ) -> None:
+        """
+        Initialize the processing base.
+
+        Args:
+            params: Initial parameters dictionary passed to the worker.
+            buffer_size: Max number of items in the input queue (arg -> class attribute -> 10).
+            drop_policy: 'drop_new', 'drop_oldest', or 'block' (arg -> class attribute -> 'drop_new').
+            daemon: Whether the worker process runs as a daemon (arg -> class attribute -> True).
+            **kwargs: Extra arguments forwarded safely.
+        """
+        cls = type(self)
+        self.params: Dict[str, Any] = dict(params) if params else {}
+        self._drop_policy = (
+            drop_policy if drop_policy is not None else getattr(cls, "drop_policy", "drop_new")
+        )
+        resolved_buffer_size = (
+            buffer_size if buffer_size is not None else getattr(cls, "buffer_size", 10)
+        )
+        self._daemon = daemon if daemon is not None else getattr(cls, "daemon", True)
+
+        self._in_queue: mp.Queue[Any] = mp.Queue(maxsize=max(1, resolved_buffer_size))
+        self._out_queue: mp.Queue[Any] = mp.Queue(1)
+        self._ctrl_queue: mp.Queue[Tuple[str, Optional[Dict[str, Any]]]] = mp.Queue()
+
+        self._process: Optional[mp.Process] = None
+
+    def start(self) -> None:
+        """Start or restart the worker process."""
+        if self._process and self._process.is_alive():
+            return
+        self._process = mp.Process(target=self._worker_entrypoint, daemon=self._daemon)
+        self._process.start()
+
+    def stop(self, timeout: float = 5.0) -> None:
+        """Request the worker to stop and wait for graceful shutdown."""
+        if not self._process or not self._process.is_alive():
+            return
+        self._ctrl_queue.put(("stop", None))
+        self._process.join(timeout)
+        if self._process.is_alive():
+            logger.warning("Worker did not stop gracefully, terminating...")
+            self._process.terminate()
+        self._process = None
+
+    def is_ready(self) -> bool:
+        """Check if worker is alive and queues are not saturated."""
+        return bool(
+            self._process
+            and self._process.is_alive()
+            and not self._in_queue.full()
+            and not self._out_queue.full()
+        )
+
+    def submit(self, data: Any, timeout: Optional[float] = None) -> bool:
+        """
+        Try to submit data to the worker for processing.
+
+        Args:
+            data: Input to be processed.
+            timeout: Timeout if blocking is used (drop_policy='block').
+
+        Returns:
+            True if data was successfully submitted, False otherwise.
+        """
+        try:
+            self._in_queue.put_nowait(data)
+            return True
+        except queue.Full:
+            if self._drop_policy == "block":
+                self._in_queue.put(data, timeout=timeout)
+                return True
+            elif self._drop_policy == "drop_oldest":
+                try:
+                    self._in_queue.get_nowait()
+                except queue.Empty:
+                    pass
+                try:
+                    self._in_queue.put_nowait(data)
+                    return True
+                except queue.Full:
+                    return False
+            elif self._drop_policy == "drop_new":
+                return False
+            else:
+                raise ValueError(f"Invalid drop_policy: {self._drop_policy}")
+
+    def get(self) -> Optional[Any]:
+        """
+        Get the next processed result from the output queue, if available.
+
+        Returns:
+            The processed result or None if no result is available.
+        """
+        try:
+            return self._out_queue.get_nowait()
+        except queue.Empty:
+            return None
+
+    # Alias to match documentation and hybrid node patterns
+    poll_result = get
+
+    def queue_size(self) -> int:
+        """
+        Get the current size of the input queue.
+
+        Returns:
+            Number of items in the input queue or -1 if unsupported.
+        """
+        try:
+            return self._in_queue.qsize()
+        except NotImplementedError:
+            return -1
+
+    def clear(self) -> None:
+        """Clear all pending items in in_queue and out_queue."""
+        while not self._in_queue.empty():
+            try:
+                self._in_queue.get_nowait()
+            except (queue.Empty, Exception):
+                break
+        while not self._out_queue.empty():
+            try:
+                self._out_queue.get_nowait()
+            except (queue.Empty, Exception):
+                break
+        try:
+            self._ctrl_queue.put_nowait(("clear", None))
+        except Exception:
+            pass
+
+    def update_params(self, **kwargs: Any) -> None:
+        """
+        Send a parameter update command to the worker process.
+
+        Args:
+            kwargs: Key-value pairs to update.
+        """
+        self._ctrl_queue.put(("update", kwargs))
+
+    def _drain_ctrl_queue(self) -> bool:
+        """Apply all pending control commands (worker side). Returns True if a stop was requested."""
+        try:
+            while True:
+                cmd, payload = self._ctrl_queue.get_nowait()
+                if cmd == "stop":
+                    return True
+                elif cmd == "update" and payload:
+                    self.params.update(payload)
+                elif cmd == "clear":
+                    while not self._in_queue.empty():
+                        try:
+                            self._in_queue.get_nowait()
+                        except (queue.Empty, Exception):
+                            break
+        except (queue.Empty, Exception):
+            pass
+        return False
+
+    def _worker_entrypoint(self) -> None:
+        """
+        Internal method run by the worker process.
+        Listens for control commands and data to process.
+        """
+        while True:
+            if self._drain_ctrl_queue():
+                return
+
+            try:
+                data = self._in_queue.get(timeout=0.01)
+            except queue.Empty:
+                continue
+
+            # Params updates sent right before this item was submitted may not have been read yet
+            # (the worker was blocked on the input queue): apply them before processing.
+            if self._drain_ctrl_queue():
+                return
+
+            try:
+                result = self._process_data(data, self.params)
+                try:
+                    self._out_queue.put_nowait(result)
+                except queue.Full:
+                    try:
+                        self._out_queue.get_nowait()
+                    except (queue.Empty, Exception):
+                        pass
+                    try:
+                        self._out_queue.put_nowait(result)
+                    except (queue.Full, Exception):
+                        pass
+            except Exception as e:
+                logger.warning(f"Error in worker: {e}")
+
+    def _process_data(self, data: Any, params: Dict[str, Any]) -> Any:
+        """
+        Method to be overridden by subclasses to perform actual processing.
+
+        Args:
+            data: Input data to process.
+            params: Current parameters dictionary.
+
+        Returns:
+            Processed output to be pushed to the output queue.
+        """
+        raise NotImplementedError("Subclasses must override _process_data()")
+

@@ -1,0 +1,100 @@
+{
+    "description": "Video Reprocessing Layout Overview",
+    "steps": [
+        {
+            "path": [],
+            "instruction": "Welcome to the Video Reprocessing workspace!\nWhen a video is processed, results are saved as CSV and NPZ files. This layout lets you replay and review tracking data synchronized with video playback.",
+            "dim": true,
+            "type": "center",
+            "links": [],
+            "view": "Video reprocessing"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Video Reader",
+                    "tag": 834,
+                    "alias": "video_reader_win_1053"
+                }
+            ],
+            "instruction": "Video Reader:\nDisplays your video files. Videos that have already been processed appear in green, indicating that their saved tracking data (.npz) is ready to replay.",
+            "dim": true,
+            "type": "observe",
+            "view": "Video reprocessing"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Motility Reprocessor",
+                    "tag": 1140,
+                    "alias": "Motility Reprocessor_1952"
+                }
+            ],
+            "instruction": "Motility Reprocessor:\nWhen you play a processed video, this module reads the .npz data and streams tracking metrics frame-by-frame in real-time sync with playback.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Video Viewer",
+                    "tag": 759,
+                    "alias": "Video Viewer_715"
+                }
+            ],
+            "instruction": "Video Viewer:\nDisplays the replayed video frames alongside reconstructed motion vectors and overlays.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Sample Container",
+                    "tag": 809,
+                    "alias": "Sample Container_718"
+                }
+            ],
+            "instruction": "Sample Container:\nAutomatically captures re-emitted data series during playback, allowing you to compare, organize, and re-export runs.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Lineplot",
+                    "tag": 776,
+                    "alias": "Lineplot_717"
+                }
+            ],
+            "instruction": "Lineplot: Plots motility curves dynamically in direct synchronization with the video playback scrubber.",
+            "dim": true,
+            "type": "observe"
+        },
+        {
+            "path": [
+                {
+                    "type": "mvAppItemType::mvWindowAppItem",
+                    "label": "Polar Plot",
+                    "tag": 1074,
+                    "alias": "Polar Plot_1599"
+                }
+            ],
+            "instruction": "Polar Plot:\nSimultaneously reconstructs angular distributions and directionality vectors as the video plays.",
+            "dim": true,
+            "type": "observe",
+            "view": "Video reprocessing"
+        },
+        {
+            "path": [],
+            "instruction": "You are now ready to reprocess and review your experiment runs!\nSelect any processed (green) video in the Video Reader and hit Play to inspect its metrics in sync.",
+            "dim": true,
+            "type": "center",
+            "links": []
+        }
+    ]
+}

@@ -1,0 +1,88 @@
+{
+    "monochrome": {
+        "channel": "Grayscale",
+        "gamma": 1.0
+    },
+    "crop": {
+        "circular_crop": false,
+        "crop_radius": 150,
+        "offset_x": 0,
+        "offset_y": 0
+    },
+    "contour": {
+        "enable_contour_detection": true,
+        "area_thresh_mode": "Absolute (px^2)",
+        "lower_surface_thresh": 25,
+        "upper_surface_thresh": 1000,
+        "show_boxes": true,
+        "show_centroids": true,
+        "isolate_selection": false,
+        "fill_contours": true,
+        "visu_format": "Frame"
+    },
+    "tracker": {
+        "enable_tracking": true,
+        "distance_function": "euclidean",
+        "distance_threshold": 30,
+        "trail_length": 30,
+        "trail_thickness": 2,
+        "show_trail": false,
+        "show_id": false,
+        "show_age": false,
+        "show_distance": false,
+        "show_speed": false,
+        "show_proximity": true
+    },
+    "reticules": {
+        "show_distance_circles": false,
+        "num_distance_circles": 5
+    },
+    "proximity": {
+        "enable_proximity": false,
+        "density_mode": "Centroid",
+        "scale_mode": "Absolute",
+        "palette": "Inferno",
+        "opacity": 0.5,
+        "show_scale": true,
+        "scale_position": "Top Right",
+        "scale_size": 150
+    },
+    "video_export": {
+        "export_next_as_video": false,
+        "crop_to_selection": false,
+        "no_subsampling": false,
+        "target_duration": 30.0,
+        "output_fps": 30
+    },
+    "denseflow": {
+        "pyr_scale": 0.5,
+        "levels": 2,
+        "winsize": 9,
+        "iterations": 2,
+        "poly_n": 5,
+        "poly_sigma": 1.1,
+        "lower_mag_thresh": 1.5,
+        "erosion": 3,
+        "supersat": true,
+        "calibration": 1.0,
+        "fps": 30.0,
+        "use_contours": false,
+        "show_arrows": true,
+        "isolate_selection": false,
+        "lower_surface_thresh": 25,
+        "upper_surface_thresh": 100
+    },
+    "global": {
+        "active": true,
+        "processing_mode": "contour",
+        "enable_preprocessing": true,
+        "buffer_size": 1,
+        "drop_policy": "drop_new",
+        "remove_static": false,
+        "similarity_threshold": 15
+    },
+    "calibration": {
+        "spatial_scale": 1.0,
+        "spatial_unit": "µm"
+    }
+}

@@ -1,0 +1,55 @@
+{
+    "General": {
+        "app_name": "Motilitometer",
+        "ui_scale_multiplier": 0.75,
+        "preload_modules": true,
+        "skip_import_validation": false
+    },
+    "Splash": {
+        "enabled": true,
+        "image": "ressources/tutorial_assets/tutorial/Success.png",
+        "size": 400,
+        "thickness": 2
+    },
+    "Icon": {
+        "path": "ressources/icon.ico"
+    },
+    "Login": {
+        "enabled": false,
+        "default_mode": "dev"
+    },
+    "UI": {
+        "theme_name": "OCEAN_DARK",
+        "colorblind_type": "none",
+        "mascot": true,
+        "enable_highlight": true
+    },
+    "Debug": {
+        "enabled": true,
+        "log_level": "TRACE",
+        "log_mkdocs": false
+    },
+    "Window": {
+        "vsync": false,
+        "minimize_to_tray": true,
+        "tray_offscreen": true,
+        "show_console": true
+    },
+    "Paths": {
+        "working_directory": "experiments",
+        "default_pipeline": null,
+        "default_automation_script": "scripts/Motilitometer.json",
+        "show_loader_on_startup": true,
+        "default_pipeline_folder": "layouts",
+        "default_scripts_folder": "scripts"
+    },
+    "Viewers": {
+        "video_viewer": {
+            "texture_mode": "raw",
+            "preserve_aspect_ratio": true
+        }
+    },
+    "SequenceProcessor": {
+        "end_seq_cmd": "R0G0B0W0IR1000"
+    }
+}

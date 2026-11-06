@@ -1,0 +1,33 @@
+{
+    "name": "Motilitometer",
+    "steps": [
+        {
+            "action": "fullscreen",
+            "seconds": 1.0,
+            "enabled": true
+        },
+        {
+            "action": "load_pipeline",
+            "seconds": 1.0,
+            "path": "/pipelines/Motilitometer.json"
+        },
+        {
+            "action": "wait",
+            "seconds": 1.0
+        },
+        {
+            "action": "send_command",
+            "seconds": 1.0,
+            "module_uuid": "1400",
+            "command": {
+                "connect": true
+            },
+            "module_type": "LightControllerWin"
+        },
+        {
+            "action": "set_workspace",
+            "seconds": 1.0,
+            "browse": true
+        }
+    ]
+}
