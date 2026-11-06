@@ -1,23 +1,25 @@
 from __future__ import annotations
 
-import numpy as np
+from typing import Any, Dict, List, Optional, Tuple
 import cv2
-from typing import Any, Dict, Optional, Tuple
 from loguru import logger
 import matplotlib
-matplotlib.use('Agg')  # Non-GUI backend for background worker
-import matplotlib.pyplot as plt
+matplotlib.use("Agg")
 import matplotlib.colors as mcolors
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
+import numpy as np
 
 from core.processing_base import ProcessingBase
+
+_TWO_PI: float = 2.0 * np.pi
 
 
 class PolarPlotProcessor(ProcessingBase):
     """
     Multiprocessing worker for background Matplotlib polar plot rendering.
-    Takes pooled vector orientation data, computes circular statistics,
+    Pools vector orientation data, computes circular statistics,
     and renders the Rose diagram / polar plot off the main GUI thread.
     """
 
@@ -29,6 +31,14 @@ class PolarPlotProcessor(ProcessingBase):
         drop_policy: str = "drop_oldest",
         daemon: bool = True,
     ) -> None:
+        self._fig: Optional[Figure] = None
+        self._canvas: Optional[FigureCanvas] = None
+        self._ax: Optional[Any] = None
+        self._canvas_key: Optional[Tuple[int, int, int]] = None
+        self._bins_cache_key: Optional[int] = None
+        self._bin_centers: Optional[np.ndarray] = None
+        self._colors_cache_key: Optional[Tuple[int, str, str, bool]] = None
+        self._cached_bar_colors: Optional[Any] = None
         super().__init__(
             params=params,
             buffer_size=buffer_size,
@@ -36,73 +46,136 @@ class PolarPlotProcessor(ProcessingBase):
             daemon=daemon,
         )
 
-    def _process_data(self, data: Any, params: Dict[str, Any]) -> Any:
+    def _get_or_create_axes(
+        self,
+        canvas_width: int,
+        canvas_height: int,
+        dpi: int,
+        fig_bg: str,
+        ax_bg: str,
+    ) -> Tuple[Figure, FigureCanvas, Any]:
+        """Return persistent Figure, FigureCanvas, and PolarAxes, recreating only on dimension/DPI changes."""
+        key = (canvas_width, canvas_height, dpi)
+        if self._fig is None or self._canvas is None or self._ax is None or self._canvas_key != key:
+            self._fig = Figure(
+                figsize=(canvas_width / dpi, canvas_height / dpi),
+                dpi=dpi,
+                facecolor=fig_bg,
+            )
+            self._canvas = FigureCanvas(self._fig)
+            self._ax = self._fig.add_subplot(111, projection="polar", facecolor=ax_bg)
+            self._canvas_key = key
+        else:
+            self._ax.clear()
+            self._fig.set_facecolor(fig_bg)
+            self._ax.set_facecolor(ax_bg)
+        return self._fig, self._canvas, self._ax
+
+    @staticmethod
+    def clean_vector_inputs(
+        angles: Any,
+        magnitudes: Any = None,
+    ) -> Tuple[np.ndarray, np.ndarray]:
+        """Sanitize raw angle and magnitude sequences into finite [0, 2π) float32 arrays."""
+        if angles is None or len(angles) == 0:
+            empty = np.empty(0, dtype=np.float32)
+            return empty, empty
+
+        angles_arr = np.asarray(angles, dtype=np.float32).ravel()
+        if magnitudes is not None and len(magnitudes) == len(angles_arr):
+            mags_arr = np.asarray(magnitudes, dtype=np.float32).ravel()
+            valid_mask = np.isfinite(angles_arr) & np.isfinite(mags_arr)
+            if bool(valid_mask.all()):
+                angles_clean = angles_arr
+                mags_clean = mags_arr
+            else:
+                angles_clean = angles_arr[valid_mask]
+                mags_clean = mags_arr[valid_mask]
+        else:
+            valid_mask = np.isfinite(angles_arr)
+            angles_clean = angles_arr if bool(valid_mask.all()) else angles_arr[valid_mask]
+            mags_clean = np.ones_like(angles_clean, dtype=np.float32)
+
+        if angles_clean.size > 0:
+            min_ang = float(np.min(angles_clean))
+            max_ang = float(np.max(angles_clean))
+            if max_ang > _TWO_PI + 0.1 and max_ang <= 360.0:
+                angles_clean = np.radians(angles_clean)
+                angles_clean = np.mod(angles_clean, _TWO_PI)
+            elif min_ang < 0.0 or max_ang >= _TWO_PI:
+                angles_clean = np.mod(angles_clean, _TWO_PI)
+
+        return angles_clean, mags_clean
+
+    def _process_data(
+        self,
+        data: List[Dict[str, Any]],
+        params: Dict[str, Any],
+    ) -> Tuple[np.ndarray, Dict[str, Any]]:
         """
-        Processes vector orientations and renders the polar plot.
-        data: list of dicts [{"angles": ndarray, "magnitudes": ndarray}, ...]
-        params: rendering configuration dictionary
-        Returns: (img_bgr, stats_dict)
+        Process vector orientations and render the polar plot.
+
+        Args:
+            data: List of frame dicts [{"angles": ndarray, "magnitudes": ndarray}, ...].
+            params: Rendering configuration dictionary.
+
+        Returns:
+            Tuple of (img_bgr, stats_dict).
         """
         if not data:
             return self._render_empty(params)
 
         try:
-            pooled_angles = []
-            pooled_mags = []
+            pooled_angles: List[np.ndarray] = []
+            pooled_mags: List[np.ndarray] = []
 
             for item in data:
-                ang = item.get("angles")
-                mag = item.get("magnitudes")
-                if ang is not None and len(ang) > 0:
+                ang, mag = self.clean_vector_inputs(item.get("angles"), item.get("magnitudes"))
+                if ang.size > 0:
                     pooled_angles.append(ang)
-                    if mag is not None and len(mag) == len(ang):
-                        pooled_mags.append(mag)
-                    else:
-                        pooled_mags.append(np.ones_like(ang))
+                    pooled_mags.append(mag)
 
             if not pooled_angles:
                 return self._render_empty(params)
 
-            all_angles = np.concatenate(pooled_angles)
-            all_mags = np.concatenate(pooled_mags)
+            if len(pooled_angles) == 1:
+                all_angles = pooled_angles[0]
+                all_mags = pooled_mags[0]
+            else:
+                all_angles = np.concatenate(pooled_angles)
+                all_mags = np.concatenate(pooled_mags)
 
-            # Clean non-finites
-            valid_mask = np.isfinite(all_angles) & np.isfinite(all_mags)
-            all_angles = all_angles[valid_mask]
-            all_mags = all_mags[valid_mask]
-
-            total_vectors = len(all_angles)
+            total_vectors = int(all_angles.size)
             if total_vectors == 0:
                 return self._render_empty(params)
 
-            # Keep angles in [0, 2*pi)
-            all_angles = np.mod(all_angles, 2 * np.pi)
+            invert_y = bool(params.get("invert_y", True))
+            plot_angles = np.mod(-all_angles, _TWO_PI) if invert_y else all_angles
 
-            # Invert Y if requested (image -> screen coordinates)
-            invert_y = params.get("invert_y", True)
-            if invert_y:
-                plot_angles = np.mod(-all_angles, 2 * np.pi)
+            weight_by_mag = bool(params.get("weight_by_magnitude", True))
+            cos_a = np.cos(plot_angles)
+            sin_a = np.sin(plot_angles)
+            sum_mag = float(np.sum(all_mags))
+            mean_speed = sum_mag / total_vectors
+
+            if weight_by_mag:
+                if sum_mag > 0.0:
+                    c_bar = float(np.dot(all_mags, cos_a)) / sum_mag
+                    s_bar = float(np.dot(all_mags, sin_a)) / sum_mag
+                    mean_angle_rad = float(np.arctan2(s_bar, c_bar)) % _TWO_PI
+                    directionality_r = float(np.hypot(c_bar, s_bar))
+                else:
+                    mean_angle_rad = 0.0
+                    directionality_r = 0.0
             else:
-                plot_angles = all_angles
-
-            # Circular statistics
-            weight_by_mag = params.get("weight_by_magnitude", True)
-            weights = all_mags if (weight_by_mag and len(all_mags) == len(plot_angles)) else np.ones_like(plot_angles)
-            sum_w = np.sum(weights)
-
-            if sum_w > 0:
-                c_bar = np.sum(weights * np.cos(plot_angles)) / sum_w
-                s_bar = np.sum(weights * np.sin(plot_angles)) / sum_w
-                mean_angle_rad = float(np.arctan2(s_bar, c_bar)) % (2 * np.pi)
-                directionality_r = float(np.sqrt(c_bar**2 + s_bar**2))
-            else:
-                mean_angle_rad = 0.0
-                directionality_r = 0.0
+                c_bar = float(np.mean(cos_a))
+                s_bar = float(np.mean(sin_a))
+                mean_angle_rad = float(np.arctan2(s_bar, c_bar)) % _TWO_PI
+                directionality_r = float(np.hypot(c_bar, s_bar))
 
             mean_angle_deg = float(np.degrees(mean_angle_rad))
-            mean_speed = float(np.mean(all_mags)) if len(all_mags) > 0 else 0.0
 
-            stats = {
+            stats: Dict[str, Any] = {
                 "mean_angle_deg": mean_angle_deg,
                 "mean_angle_rad": mean_angle_rad,
                 "directionality_r": directionality_r,
@@ -111,82 +184,70 @@ class PolarPlotProcessor(ProcessingBase):
                 "accumulated_frames": len(data),
             }
 
-            # Theme colors
-            is_light = params.get("is_light", False)
+            is_light = bool(params.get("is_light", False))
             if is_light:
-                fig_bg = "#f4f5f7"
-                ax_bg = "#ffffff"
-                text_color = "#1f2937"
-                tick_color = "#4b5563"
-                grid_color = "#d1d5db"
-                bar_edge = "#374151"
-                arrow_color = "#0284c7"
-                arrow_edge = "#0f172a"
+                fig_bg, ax_bg = "#f4f5f7", "#ffffff"
+                text_color, tick_color, grid_color = "#1f2937", "#4b5563", "#d1d5db"
+                bar_edge, arrow_color, arrow_edge = "#374151", "#0284c7", "#0f172a"
             else:
-                fig_bg = "#1e1e1e"
-                ax_bg = "#141414"
-                text_color = "#ffffff"
-                tick_color = "#cccccc"
-                grid_color = "#444444"
-                bar_edge = "#ffffff"
-                arrow_color = "#00ffff"
-                arrow_edge = "#ffffff"
+                fig_bg, ax_bg = "#1e1e1e", "#141414"
+                text_color, tick_color, grid_color = "#ffffff", "#cccccc", "#444444"
+                bar_edge, arrow_color, arrow_edge = "#ffffff", "#00ffff", "#ffffff"
 
-            # Canvas setup
-            canvas_width = int(params.get("canvas_width", 1000))
-            canvas_height = int(params.get("canvas_height", 1000))
-            dpi = int(params.get("dpi", 100))
+            canvas_width = max(200, int(params.get("canvas_width", 1000)))
+            canvas_height = max(200, int(params.get("canvas_height", 1000)))
+            dpi = max(50, int(params.get("dpi", 100)))
 
-            fig = Figure(
-                figsize=(canvas_width / dpi, canvas_height / dpi),
-                dpi=dpi,
-                facecolor=fig_bg
-            )
-            canvas = FigureCanvas(fig)
-            ax = fig.add_subplot(111, projection='polar', facecolor=ax_bg)
+            _, canvas, ax = self._get_or_create_axes(canvas_width, canvas_height, dpi, fig_bg, ax_bg)
 
-            zero_location = params.get("zero_location", "E")
-            clockwise = params.get("clockwise", False)
+            zero_location = str(params.get("zero_location", "E"))
+            clockwise = bool(params.get("clockwise", False))
             ax.set_theta_zero_location(zero_location)
             ax.set_theta_direction(-1 if clockwise else 1)
-            ax.grid(True, color=grid_color, linestyle='--', alpha=0.7)
+            ax.grid(True, color=grid_color, linestyle="--", alpha=0.7)
             ax.tick_params(colors=tick_color, labelsize=8)
 
-            # Histogram computation
-            num_bins = int(params.get("num_bins", 24))
-            theta_bins = np.linspace(0, 2 * np.pi, num_bins + 1)
-            width = 2 * np.pi / num_bins
-            bin_centers = theta_bins[:-1] + width / 2.0
+            num_bins = max(8, min(360, int(params.get("num_bins", 24))))
+            width = _TWO_PI / num_bins
+            if self._bins_cache_key != num_bins or self._bin_centers is None:
+                theta_bins = np.linspace(0.0, _TWO_PI, num_bins + 1, dtype=np.float32)
+                self._bin_centers = theta_bins[:-1] + width * 0.5
+                self._bins_cache_key = num_bins
+            bin_centers = self._bin_centers
 
-            if weight_by_mag:
-                counts, _ = np.histogram(plot_angles, bins=theta_bins, weights=all_mags)
+            bin_idx = np.clip((plot_angles * (num_bins / _TWO_PI)).astype(np.intp), 0, num_bins - 1)
+            counts = np.bincount(
+                bin_idx,
+                weights=all_mags if weight_by_mag else None,
+                minlength=num_bins,
+            ).astype(np.float32)
+
+            total_counts = float(np.sum(counts))
+            if bool(params.get("normalize", False)) and total_counts > 0.0:
+                counts = (counts / total_counts) * 100.0
+
+            color_mode = str(params.get("color_mode", "Angle (HSV Flow)"))
+            colormap_name = str(params.get("colormap", "turbo"))
+            max_count_raw = float(np.max(counts)) if counts.size > 0 else 0.0
+            max_count = max_count_raw if max_count_raw > 0.0 else 1.0
+
+            if color_mode in ("Angle (HSV Flow)", "Angle (Colormap)"):
+                color_key = (num_bins, color_mode, colormap_name, invert_y)
+                if self._colors_cache_key != color_key or self._cached_bar_colors is None:
+                    if color_mode == "Angle (HSV Flow)":
+                        orig_image_angs = np.mod(-bin_centers, _TWO_PI) if invert_y else bin_centers
+                        hues = (orig_image_angs / _TWO_PI) % 1.0
+                        hsv_arr = np.column_stack((hues, np.ones_like(hues), np.ones_like(hues)))
+                        self._cached_bar_colors = mcolors.hsv_to_rgb(hsv_arr)
+                    else:
+                        cmap = plt.get_cmap(colormap_name)
+                        self._cached_bar_colors = cmap((bin_centers / _TWO_PI) % 1.0)
+                    self._colors_cache_key = color_key
+                colors: Any = self._cached_bar_colors
             else:
-                counts, _ = np.histogram(plot_angles, bins=theta_bins)
-
-            if params.get("normalize", False) and np.sum(counts) > 0:
-                counts = (counts / np.sum(counts)) * 100.0
-
-            # Colors
-            color_mode = params.get("color_mode", "Angle (HSV Flow)")
-            colormap_name = params.get("colormap", "turbo")
-            max_count = np.max(counts) if len(counts) > 0 and np.max(counts) > 0 else 1.0
-
-            if color_mode == "Angle (HSV Flow)":
-                if invert_y:
-                    orig_image_angs = np.mod(-bin_centers, 2 * np.pi)
-                else:
-                    orig_image_angs = bin_centers
-                hues = (orig_image_angs / (2.0 * np.pi)) % 1.0
-                colors = [mcolors.hsv_to_rgb([h, 1.0, 1.0]) for h in hues]
-            elif color_mode == "Angle (Colormap)":
                 cmap = plt.get_cmap(colormap_name)
-                colors = [cmap((bc / (2.0 * np.pi)) % 1.0) for bc in bin_centers]
-            else:
-                cmap = plt.get_cmap(colormap_name)
-                norm_counts = counts / max_count
-                colors = [cmap(nc) for nc in norm_counts]
+                colors = cmap(counts / max_count)
 
-            # Render Rose diagram bars
             ax.bar(
                 bin_centers,
                 counts,
@@ -195,15 +256,13 @@ class PolarPlotProcessor(ProcessingBase):
                 color=colors,
                 edgecolor=bar_edge,
                 alpha=0.88,
-                linewidth=0.7
+                linewidth=0.7,
             )
 
-            # Overlay Mean Resultant Vector Arrow
-            show_mean = params.get("show_mean_vector", True)
-            if show_mean and max_count > 0:
+            if bool(params.get("show_mean_vector", True)) and max_count_raw > 0.0:
                 arrow_r = max_count * max(0.18, directionality_r)
                 ax.annotate(
-                    '',
+                    "",
                     xy=(mean_angle_rad, arrow_r),
                     xytext=(0, 0),
                     arrowprops=dict(
@@ -212,18 +271,17 @@ class PolarPlotProcessor(ProcessingBase):
                         width=2.5,
                         headwidth=9,
                         headlength=9,
-                        alpha=0.95
-                    )
+                        alpha=0.95,
+                    ),
                 )
-                ax.plot([mean_angle_rad], [arrow_r], 'o', color=arrow_color, markersize=4)
+                ax.plot([mean_angle_rad], [arrow_r], "o", color=arrow_color, markersize=4)
 
-            plot_title = params.get("plot_title", "")
+            plot_title = str(params.get("plot_title", ""))
             title = plot_title or f"Global Vector Direction (N={total_vectors})"
             ax.set_title(title, color=text_color, fontsize=11, pad=12)
 
             canvas.draw()
-            rgba_buffer = canvas.buffer_rgba()
-            img_rgba = np.asarray(rgba_buffer)
+            img_rgba = np.asarray(canvas.buffer_rgba())
             img_bgr = cv2.cvtColor(img_rgba, cv2.COLOR_RGBA2BGR)
 
             return img_bgr, stats
@@ -233,60 +291,46 @@ class PolarPlotProcessor(ProcessingBase):
             return self._render_empty(params)
 
     def _render_empty(self, params: Dict[str, Any]) -> Tuple[np.ndarray, Dict[str, Any]]:
-        """Renders an empty polar plot."""
+        """Render an empty polar plot."""
+        empty_stats: Dict[str, Any] = {
+            "mean_angle_deg": 0.0,
+            "mean_angle_rad": 0.0,
+            "directionality_r": 0.0,
+            "mean_speed": 0.0,
+            "total_vectors": 0,
+            "accumulated_frames": 0,
+        }
         try:
-            is_light = params.get("is_light", False)
+            is_light = bool(params.get("is_light", False))
             fig_bg = "#f4f5f7" if is_light else "#1e1e1e"
             ax_bg = "#ffffff" if is_light else "#141414"
             text_color = "#1f2937" if is_light else "#ffffff"
             tick_color = "#4b5563" if is_light else "#cccccc"
             grid_color = "#d1d5db" if is_light else "#444444"
 
-            canvas_width = int(params.get("canvas_width", 1000))
-            canvas_height = int(params.get("canvas_height", 1000))
-            dpi = int(params.get("dpi", 100))
+            canvas_width = max(200, int(params.get("canvas_width", 1000)))
+            canvas_height = max(200, int(params.get("canvas_height", 1000)))
+            dpi = max(50, int(params.get("dpi", 100)))
 
-            fig = Figure(
-                figsize=(canvas_width / dpi, canvas_height / dpi),
-                dpi=dpi,
-                facecolor=fig_bg
-            )
-            canvas = FigureCanvas(fig)
-            ax = fig.add_subplot(111, projection='polar', facecolor=ax_bg)
+            _, canvas, ax = self._get_or_create_axes(canvas_width, canvas_height, dpi, fig_bg, ax_bg)
 
-            zero_location = params.get("zero_location", "E")
-            clockwise = params.get("clockwise", False)
+            zero_location = str(params.get("zero_location", "E"))
+            clockwise = bool(params.get("clockwise", False))
             ax.set_theta_zero_location(zero_location)
             ax.set_theta_direction(-1 if clockwise else 1)
-            ax.grid(True, color=grid_color, linestyle='--', alpha=0.7)
+            ax.grid(True, color=grid_color, linestyle="--", alpha=0.7)
             ax.tick_params(colors=tick_color, labelsize=8)
 
-            title = params.get("plot_title", "") or "Global Vector Direction"
+            title = str(params.get("plot_title", "")) or "Global Vector Direction"
             ax.set_title(title, color=text_color, fontsize=11, pad=12)
 
             canvas.draw()
-            rgba_buffer = canvas.buffer_rgba()
-            img_rgba = np.asarray(rgba_buffer)
+            img_rgba = np.asarray(canvas.buffer_rgba())
             img_bgr = cv2.cvtColor(img_rgba, cv2.COLOR_RGBA2BGR)
 
-            empty_stats = {
-                "mean_angle_deg": 0.0,
-                "mean_angle_rad": 0.0,
-                "directionality_r": 0.0,
-                "mean_speed": 0.0,
-                "total_vectors": 0,
-                "accumulated_frames": 0,
-            }
             return img_bgr, empty_stats
         except Exception as e:
             logger.error(f"PolarPlotProcessor render empty error: {e}")
-            cw = int(params.get("canvas_width", 1000))
-            ch = int(params.get("canvas_height", 1000))
-            return np.zeros((ch, cw, 3), dtype=np.uint8), {
-                "mean_angle_deg": 0.0,
-                "mean_angle_rad": 0.0,
-                "directionality_r": 0.0,
-                "mean_speed": 0.0,
-                "total_vectors": 0,
-                "accumulated_frames": 0,
-            }
+            cw = max(200, int(params.get("canvas_width", 1000)))
+            ch = max(200, int(params.get("canvas_height", 1000)))
+            return np.zeros((ch, cw, 3), dtype=np.uint8), empty_stats
