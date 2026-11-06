@@ -28,6 +28,15 @@ class _LinkOutNode:
         if name:
             link_bus.publish(name, *args, **kwargs)
 
+    def is_ready(self) -> bool:
+        name = self._get_live_name()
+        return link_bus.is_ready(name) if name else True
+
+    def set_acquisition(self, *args: Any, **kwargs: Any) -> None:
+        name = self._get_live_name()
+        if name:
+            link_bus.set_acquisition(name, *args, **kwargs)
+
     def _get_live_name(self) -> str:
         if dpg.does_item_exist(self._name_input_tag):
             return dpg.get_value(self._name_input_tag).strip()
@@ -82,6 +91,22 @@ class _LinkInNode:
                 module.input_cb(*args, **kwargs)
             except Exception as e:
                 logger.error(f"LinkIn '{self.link_name}': dispatch error - {e}")
+
+    def is_ready(self) -> bool:
+        for module in self.connections.get("Out", []):
+            is_ready = getattr(module, "is_ready", lambda: True)
+            if callable(is_ready) and not is_ready():
+                return False
+        return True
+
+    def set_acquisition(self, *args: Any, **kwargs: Any) -> None:
+        for module in self.connections.get("Out", []):
+            fn = getattr(module, "set_acquisition", None)
+            if callable(fn):
+                try:
+                    fn(*args, **kwargs)
+                except Exception as e:
+                    logger.error(f"LinkIn '{self.link_name}': set_acquisition error - {e}")
 
     def _get_live_name(self) -> str:
         """Get the current channel name from the DPG widget or fallback to link_name."""
