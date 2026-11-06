@@ -700,6 +700,17 @@ class MotilitySimulator_win(WindowBase):
     def _emit_frame(self, frame: np.ndarray, idx: int, name: str = "synthetic") -> None:
         self._emit("Frame", (frame, name, idx), IOTypes.FRAME)
 
+    def _sync_acquisition(self, fps: float, calibration: float) -> None:
+        """Pushes the simulated fps / µm-per-px to downstream modules (e.g. the Counter Tracker)
+        so live speeds are converted with exactly the values used to generate the motion."""
+        for module in list(self.connections.get("Frame", [])) + list(self.connections.get("File Path", [])):
+            fn = getattr(module, "set_acquisition", None)
+            if callable(fn):
+                try:
+                    fn(fps=fps, calibration=calibration)
+                except Exception as e:
+                    logger.error(f"MotilitySimulator acquisition sync error: {e}")
+
     def _suid(self, prefix: str, source: str) -> str:
         cache_key = (prefix, source)
         cached = self._suid_cache.get(cache_key)
@@ -1051,6 +1062,7 @@ class MotilitySimulator_win(WindowBase):
         realtime = bool(cfg["realtime"])
         interval = 1.0 / fps
         idx = 0
+        self._sync_acquisition(engine.fps, float(cfg["calibration"]))
         self._emit("Trigger", "START", IOTypes.TRIGGER)
         try:
             m = engine.live_metrics()
@@ -1071,6 +1083,7 @@ class MotilitySimulator_win(WindowBase):
                         realtime = bool(fresh_cfg["realtime"])
                         interval = 1.0 / fps
                         idx = 0
+                        self._sync_acquisition(engine.fps, float(fresh_cfg["calibration"]))
                         nxt = t_start = time.perf_counter()
                         self._pending_restart = False
                         self._structural_dirty = False
@@ -1217,6 +1230,7 @@ class MotilitySimulator_win(WindowBase):
             params = engine.params_dict()
             params["video"] = {"path": path, "codec": codec, "frames": total}
             save_params(stem + "_params.json", params)
+            self._sync_acquisition(engine.fps, float(cfg["calibration"]))
             self._status(f"Exported {os.path.basename(path)} (+ _gt.csv, _params.json)")
             self._emit("File Path", (path, os.path.basename(path)), IOTypes.FILE_PATH)
         except Exception as e:
