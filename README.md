@@ -24,8 +24,7 @@ This project provides the control interface, hardware orchestration, and video a
   - Adaptive contour detection, thresholding, and surface coverage.
   - Multi-target tracking and velocity vector computation.
   - Dense optical flow (Farneback) and sedimentation/drift compensation.
-  - Angular distributions, rose diagrams, kymographs, and Phototaxis Index calculation.
-- **Node-Based Modular Architecture:** Visual node canvas powered by [Pipeline_creator](https://github.com/n3odym3/Pipeline_creator) (Dear PyGui), with process-isolated heavy computing nodes, zero-wire link routing, and flexible layout saving/restoration.
+  - Angular distributions, Polar plot, spectrograph, and Phototaxis Index calculation.
 
 ---
 
